@@ -5,12 +5,80 @@ import NoteList from './components/NoteList';
 import AuthModal from './components/AuthModal';
 import SettingsView from './components/SettingsView';
 
+import { getInitialSettings } from './config/settings';
+
 function App() {
-    const [mode, setMode] = useState('ROOT'); // ROOT, EDITOR, LIST, HELP, AUTH, CONF
+    const [mode, setMode] = useState('ROOT');
     const [statusMsg, setStatusMsg] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [activeNoteId, setActiveNoteId] = useState(null);
     const [inputVal, setInputVal] = useState('');
+
+    // Settings State
+    const [settings, setSettings] = useState(getInitialSettings());
+
+    // Apply Settings (Themes & Layout)
+    useEffect(() => {
+        // Theme Logic
+        const root = document.documentElement;
+
+        // Reset classes
+        root.classList.remove('theme-light', 'theme-dark', 'theme-velvet');
+
+        // Apply theme class (assuming we set these up in CSS, or just handle styles manually here)
+        // For now, let's use the 'theme' value.
+        // User requested "Velvet", "Dark", "Light".
+        // Default is Velvet.
+        if (settings.theme === 'light') {
+            root.style.setProperty('--bg-color', '#F7F5F0'); // Warm beige
+            root.style.setProperty('--text-color', '#1A1A1A');
+            root.style.setProperty('--border-color', 'rgba(0,0,0,0.08)');
+            root.style.setProperty('--surface-color', '#E8DCC0'); // Warm gold selection
+            root.style.setProperty('--stripe-color', 'rgba(0,0,0,0.02)'); // Very subtle dark tint
+            root.style.setProperty('--muted-color', 'rgba(0,0,0,0.4)');
+        } else if (settings.theme === 'dark') {
+            root.style.setProperty('--bg-color', '#111111');
+            root.style.setProperty('--text-color', '#ffffff');
+            root.style.setProperty('--border-color', 'rgba(255,255,255,0.1)');
+            root.style.setProperty('--surface-color', 'rgba(255,255,255,0.1)');
+            root.style.setProperty('--stripe-color', 'rgba(255,255,255,0.03)'); // Subtle white tint
+            root.style.setProperty('--muted-color', 'rgba(255,255,255,0.5)');
+        } else {
+            // Velvet (Void default)
+            root.style.setProperty('--bg-color', '#0D0D0D');
+            root.style.setProperty('--text-color', '#ffffff');
+            root.style.setProperty('--border-color', 'rgba(255,255,255,0.1)');
+            root.style.setProperty('--surface-color', 'rgba(255,255,255,0.1)');
+            root.style.setProperty('--muted-color', 'rgba(255,255,255,0.5)');
+        }
+
+        // Apply visual settings (border radius, width, etc)
+        const formatValue = (val, unit) => {
+            if (!val) return '0';
+            // If value already has non-numeric chars (like 'px', 'rem'), use it as is
+            if (isNaN(val)) return val;
+            return `${val}${unit}`;
+        };
+
+        root.style.setProperty('--border-radius', formatValue(settings.border_radius, 'rem'));
+        root.style.setProperty('--border-width', formatValue(settings.border_width, 'px'));
+        // ... other settings can be applied here or used in components via props
+
+    }, [settings]);
+
+    const handleUpdateSettings = (key, value) => {
+        if (key === 'reset_defaults') {
+            setSettings(getInitialSettings());
+            return;
+        }
+        setSettings(prev => ({
+            ...prev,
+            [key]: value
+        }));
+    };
+
+    // ... (rest of code) ...
+
 
     // Global Key Handler for Navigation
     useEffect(() => {
@@ -24,6 +92,10 @@ function App() {
                 }
             }
             if (e.key === 'Backspace' && mode === 'CONF') {
+                // If editing (target is input), do not exit
+                if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+                    return;
+                }
                 setMode('ROOT');
                 setInputVal(''); // Clear input on backspace exit too
             }
@@ -76,7 +148,13 @@ function App() {
     };
 
     return (
-        <div className="bg-[#0D0D0D] min-h-screen text-white font-mono flex items-center justify-center overflow-hidden">
+        <div
+            className="min-h-screen font-mono flex items-center justify-center overflow-hidden transition-colors duration-300"
+            style={{
+                backgroundColor: 'var(--bg-color)',
+                color: 'var(--text-color)'
+            }}
+        >
             {mode === 'AUTH' && <AuthModal onClose={() => setMode('ROOT')} />}
 
             {mode === 'EDITOR' ? (
@@ -86,9 +164,16 @@ function App() {
                         setMode('ROOT');
                         setActiveNoteId(null);
                     }}
+                    settings={settings}
                 />
             ) : (
-                <div className="w-full max-w-[600px] p-4 flex flex-col items-center h-screen pt-[20vh]">
+                <div
+                    className="w-full p-4 flex flex-col items-center h-screen transition-all duration-300 ease-in-out"
+                    style={{
+                        paddingTop: settings.margin_top_of_line ? (isNaN(settings.margin_top_of_line) ? settings.margin_top_of_line : `${settings.margin_top_of_line}vh`) : '20vh',
+                        maxWidth: settings.width_of_line ? (isNaN(settings.width_of_line) ? settings.width_of_line : `${settings.width_of_line}rem`) : '600px'
+                    }}
+                >
 
                     <div className="w-full mb-2 h-6 text-center text-sm text-green-500 animate-pulse flex-shrink-0">
                         {statusMsg}
@@ -98,10 +183,22 @@ function App() {
                     <div className="w-full flex-1 overflow-y-auto custom-scrollbar min-h-0 flex flex-col items-center">
                         {mode === 'CONF' ? (
                             <div className="w-full mb-8 animate-in fade-in slide-in-from-top-4 flex-shrink-0">
-                                <div className="flex items-center gap-2 bg-white/5 p-2 rounded-lg border border-white/10 w-fit">
-                                    <span className="bg-white/10 px-2 py-1 rounded text-white text-sm font-bold">/conf</span>
+                                <div
+                                    className="flex items-center gap-2 p-2 rounded-lg border w-fit"
+                                    style={{
+                                        backgroundColor: 'var(--surface-color)',
+                                        borderColor: 'var(--border-color)'
+                                    }}
+                                >
+                                    <span
+                                        className="px-2 py-1 rounded text-sm font-bold"
+                                        style={{
+                                            backgroundColor: 'var(--muted-color)',
+                                            color: 'var(--text-color)'
+                                        }}
+                                    >/conf</span>
                                 </div>
-                                <div className="text-right text-xs text-white/20 mt-1">esc or backspace to exit</div>
+                                <div className="text-right text-xs mt-1" style={{ color: 'var(--muted-color)' }}>esc or backspace to exit</div>
                             </div>
                         ) : (
                             <CommandBar
@@ -109,32 +206,65 @@ function App() {
                                 onChange={setInputVal}
                                 onCommand={handleCommand}
                                 onSearch={handleSearch}
+                                placeholder={settings.placeholder_text}
                             />
                         )}
 
                         {mode === 'ROOT' && !searchTerm && (
-                            <div className="mt-4 flex gap-4 w-full animate-in fade-in slide-in-from-top-2 flex-shrink-0">
-                                <div className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-lg border border-white/5">
-                                    <span className="bg-white/10 px-1.5 py-0.5 rounded text-white/90 text-xs font-medium">/c</span>
-                                    <span className="text-white/40 text-xs">create new note</span>
-                                </div>
-                                <div className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-lg border border-white/5">
-                                    <span className="bg-white/10 px-1.5 py-0.5 rounded text-white/90 text-xs font-medium">/a</span>
-                                    <span className="text-white/40 text-xs">view all notes</span>
-                                </div>
-                                <div className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-lg border border-white/5">
-                                    <span className="bg-white/10 px-1.5 py-0.5 rounded text-white/90 text-xs font-medium">/h</span>
-                                    <span className="text-white/40 text-xs">show commands</span>
-                                </div>
-                            </div>
+                            <>
+                                {settings.show_commands_on_homepage !== 'false' && (
+                                    <div className="mt-4 flex gap-4 w-full animate-in fade-in slide-in-from-top-2 flex-shrink-0">
+                                        <div
+                                            className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs"
+                                            style={{ borderColor: 'var(--border-color)' }}
+                                        >
+                                            <span
+                                                className="px-1.5 py-0.5 rounded font-medium"
+                                                style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}
+                                            >/c</span>
+                                            <span style={{ color: 'var(--muted-color)' }}>create new note</span>
+                                        </div>
+                                        <div
+                                            className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs"
+                                            style={{ borderColor: 'var(--border-color)' }}
+                                        >
+                                            <span
+                                                className="px-1.5 py-0.5 rounded font-medium"
+                                                style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}
+                                            >/a</span>
+                                            <span style={{ color: 'var(--muted-color)' }}>view all notes</span>
+                                        </div>
+                                        <div
+                                            className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs"
+                                            style={{ borderColor: 'var(--border-color)' }}
+                                        >
+                                            <span
+                                                className="px-1.5 py-0.5 rounded font-medium"
+                                                style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}
+                                            >/h</span>
+                                            <span style={{ color: 'var(--muted-color)' }}>show commands</span>
+                                        </div>
+                                    </div>
+                                )}
+                                {settings.show_recent_notes_on_homepage === 'true' && (
+                                    <div className="w-full mt-8">
+                                        <div className="text-xs mb-2 font-mono" style={{ color: 'var(--muted-color)' }}>RECENT</div>
+                                        <NoteList
+                                            onSelectNote={handleSelectNote}
+                                            settings={settings}
+                                            limit={3}
+                                        />
+                                    </div>
+                                )}
+                            </>
                         )}
 
                         {mode === 'LIST' && (
-                            <NoteList searchTerm={searchTerm} onSelectNote={handleSelectNote} />
+                            <NoteList searchTerm={searchTerm} onSelectNote={handleSelectNote} settings={settings} />
                         )}
 
                         {mode === 'CONF' && (
-                            <SettingsView />
+                            <SettingsView settings={settings} onUpdateSettings={handleUpdateSettings} />
                         )}
 
                         {mode === 'HELP' && (

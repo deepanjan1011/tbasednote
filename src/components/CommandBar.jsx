@@ -6,7 +6,7 @@ export function cn(...inputs) {
     return twMerge(clsx(inputs));
 }
 
-const CommandBar = ({ onCommand, onSearch, value, onChange }) => {
+const CommandBar = ({ onCommand, onSearch, value, onChange, placeholder }) => {
     const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef(null);
 
@@ -48,11 +48,14 @@ const CommandBar = ({ onCommand, onSearch, value, onChange }) => {
                 onKeyDown={handleKeyDown}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
-                placeholder="Search or command..."
+                placeholder={placeholder || "Search or command..."}
                 className={cn(
-                    "w-full bg-transparent text-white placeholder-white/20 text-lg outline-none border-b border-white/10 py-2 transition-all duration-300",
-                    "focus:border-white/30 focus:placeholder-white/10"
+                    "w-full bg-transparent text-lg outline-none border-b py-2 transition-all duration-300 placeholder-[var(--muted-color)]",
                 )}
+                style={{
+                    color: 'var(--text-color)',
+                    borderColor: 'var(--surface-color)'
+                }}
                 autoComplete="off"
                 spellCheck="false"
             />

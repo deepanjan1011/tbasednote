@@ -1,142 +1,308 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { clsx } from 'clsx';
+import { SECTIONS } from '../config/settings';
 
-const SECTIONS = [
-    // ... (no changes to SECTIONS, but I need to include context to match lines if I don't replace the whole file. Actually I can just replace the imports and the render part.
-    // But the replace_file_content tool works on chunks. I will do 2 chunks if possible or 1 large one. 
-    // The file is small enough to replace imports effectively. 
-    // Wait, I can just replace the whole file to be safe and ensure everything is correct, or just the top and bottom.
-    // Let's replace the top imports first.
+const SettingsView = ({ settings, onUpdateSettings }) => {
+    // Local state fallback if main app isn't ready (though we will update app next)
+    // We use a ref to editing input to focus it
+    const [editingKey, setEditingKey] = useState(null);
+    const [editValue, setEditValue] = useState('');
 
-    {
-        title: 'Appearance',
-        items: [
-            { key: 'theme', value: 'velvet', type: 'select', options: ['light', 'dark', 'velvet'] },
-            { key: 'border_radius', value: '0.5', unit: 'rem', type: 'number' },
-            { key: 'border_width', value: '1', unit: 'px', type: 'number' },
-            { key: 'zebra_striping', value: 'false', type: 'boolean' }
-        ]
-    },
-    {
-        title: 'Homepage',
-        items: [
-            { key: 'placeholder_text', value: 'Search or command...', type: 'text' },
-            { key: 'show_recent_notes_on_homepage', value: 'false', type: 'boolean' },
-            { key: 'show_commands_on_homepage', value: 'true', type: 'boolean' },
-            { key: 'show_navigation_hints', value: 'true', type: 'boolean' }
-        ]
-    },
-    {
-        title: 'Editor',
-        items: [
-            { key: 'editor_font', value: 'Inter', type: 'text' },
-            { key: 'editor_font_size', value: '16', unit: 'px', type: 'number' }
-        ]
-    },
-    {
-        title: 'Layout',
-        items: [
-            { key: 'margin_top_of_line', value: '25', unit: 'vh', type: 'number' },
-            { key: 'width_of_line', value: '48', unit: 'rem', type: 'number' }
-        ]
-    },
-    {
-        title: 'Search',
-        items: [
-            { key: 'match_threshold', value: '48', unit: '%', type: 'number' }
-        ]
-    },
-    {
-        title: 'Actions',
-        items: [
-            { key: 'reset_defaults', type: 'action' }
-        ]
-    }
-];
-
-const SettingsView = () => {
-    // Flatten implementation for easy index navigation
-    const allItems = React.useMemo(() => {
-        return SECTIONS.flatMap(section =>
-            section.items.map(item => ({ ...item, sectionTitle: section.title }))
-        );
-    }, []);
-
+    const [expanded, setExpanded] = useState(new Set());
     const [selectedIndex, setSelectedIndex] = useState(0);
-    const itemRefs = React.useRef([]);
+    const listRef = useRef(null);
+    const itemRefs = useRef([]);
+    const inputRef = useRef(null);
 
-    // Reset refs when items change (static for now but good practice)
-    itemRefs.current = new Array(allItems.length);
+    // Use settings from props, or empty object if not provided (should be provided)
+    const values = settings || {};
 
+    // Generate flat list
+    const flatList = React.useMemo(() => {
+        const list = [];
+        SECTIONS.forEach(section => {
+            section.items.forEach(item => {
+                // Add the main item
+                list.push({
+                    type: 'item',
+                    data: item,
+                    key: item.key,
+                    section: section.title
+                });
+
+                // If expanded, add options
+                if (expanded.has(item.key) && item.options) {
+                    item.options.forEach(opt => {
+                        list.push({
+                            type: 'option',
+                            parentKey: item.key,
+                            value: opt,
+                            key: `${item.key}-opt-${opt}`
+                        });
+                    });
+                }
+            });
+        });
+        return list;
+    }, [expanded, values]); // Re-calc if expansion changes
+
+    // Reset refs array when list changes size
     useEffect(() => {
+        itemRefs.current = itemRefs.current.slice(0, flatList.length);
+    }, [flatList.length]);
+
+    // Focus input when editing starts
+    useEffect(() => {
+        if (editingKey && inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, [editingKey]);
+
+    // 3. Keyboard Handling
+    useEffect(() => {
+        if (editingKey) return; // Disable nav while editing
+
         const handleKeyDown = (e) => {
             if (e.key === 'ArrowUp') {
                 e.preventDefault();
-                setSelectedIndex(prev => Math.max(0, prev - 1));
+                setSelectedIndex(prev => {
+                    const next = prev - 1;
+                    if (expanded.size > 0) {
+                        // Find the expanded group bounds
+                        // Since we force single expansion, we can find the bounds of the current group
+                        // But we need to know WHICH group we are in?
+                        // If we are locked, we assume we are at or below the parent.
+                        // Actually, simpler: find the expanded item index.
+                        const expandedKey = Array.from(expanded)[0];
+                        const parentIndex = flatList.findIndex(x => x.key === expandedKey);
+                        if (parentIndex !== -1 && next < parentIndex) return prev; // Block going above parent
+                    }
+                    return Math.max(0, next);
+                });
             } else if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                setSelectedIndex(prev => Math.min(allItems.length - 1, prev + 1));
+                setSelectedIndex(prev => {
+                    const next = prev + 1;
+                    if (expanded.size > 0) {
+                        const expandedKey = Array.from(expanded)[0];
+                        const parentIndex = flatList.findIndex(x => x.key === expandedKey);
+                        // Find number of options
+                        // We can look at flatList sequence
+                        // The items after parentIndex should be options with parentKey === expandedKey
+                        let endIndex = parentIndex;
+                        while (endIndex + 1 < flatList.length && flatList[endIndex + 1].parentKey === expandedKey) {
+                            endIndex++;
+                        }
+                        if (next > endIndex) return prev; // Block going below last option
+                    }
+                    return Math.min(flatList.length - 1, next);
+                });
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                const current = flatList[selectedIndex];
+                if (!current) return;
+
+                if (current.type === 'item') {
+                    const item = current.data;
+                    if (item.type === 'boolean') {
+                        onUpdateSettings?.(item.key, values[item.key] === 'true' ? 'false' : 'true');
+                    } else if (item.type === 'select') {
+                        // Toggle expansion
+                        // Toggle expansion (Accordion style - close others)
+                        setExpanded(prev => {
+                            const next = new Set();
+                            if (!prev.has(item.key)) next.add(item.key);
+                            return next;
+                        });
+                    } else if (item.type === 'text' || item.type === 'number') {
+                        // Start editing
+                        setEditingKey(item.key);
+                        setEditValue(values[item.key]);
+                    } else if (item.type === 'action') {
+                        onUpdateSettings?.(item.key);
+                    }
+                } else if (current.type === 'option') {
+                    // Select option
+                    onUpdateSettings?.(current.parentKey, current.value);
+                    setExpanded(new Set()); // Close after selection
+                    // Move cursor back to parent item
+                    const parentIdx = flatList.findIndex(x => x.key === current.parentKey);
+                    if (parentIdx !== -1) setSelectedIndex(parentIdx);
+                }
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [allItems.length]);
+    }, [flatList, selectedIndex, editingKey, values, onUpdateSettings]);
 
-    // Scroll into view logic
+    // Scroll active item into view
     useEffect(() => {
-        const selectedEl = itemRefs.current[selectedIndex];
-        if (selectedEl) {
-            selectedEl.scrollIntoView({
-                behavior: 'smooth',
-                block: 'nearest',
-            });
+        if (editingKey) return;
+        const el = itemRefs.current[selectedIndex];
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
-    }, [selectedIndex]);
+    }, [selectedIndex, editingKey]);
 
-    let globalIndex = 0;
+    const handleInputKeyDown = (e, key) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            onUpdateSettings?.(key, editValue);
+            setEditingKey(null);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setEditingKey(null);
+        }
+    };
+
+    // Helper to render value with color
+    const renderValue = (item) => {
+        // If editing this item
+        if (editingKey === item.key) {
+            return (
+                <input
+                    ref={inputRef}
+                    type="text"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => handleInputKeyDown(e, item.key)}
+                    onBlur={() => {
+                        // Optional: save on blur or cancel? Let's save.
+                        onUpdateSettings?.(item.key, editValue);
+                        setEditingKey(null);
+                    }}
+                    className="bg-transparent border-b text-center outline-none w-24"
+                    style={{
+                        color: 'var(--text-color)',
+                        borderColor: 'var(--muted-color)'
+                    }}
+                />
+            );
+        }
+
+        const val = values[item.key];
+        const isBool = item.type === 'boolean';
+        const colorClass = isBool
+            ? (val === 'false' ? 'text-red-400' : 'text-green-400')
+            : 'text-blue-300';
+
+        return (
+            <span style={{ color: 'var(--text-color)', opacity: 0.8 }}>
+                <span className={colorClass}>"{val}"</span>
+                {item.unit && <span style={{ color: 'var(--muted-color)' }} className="ml-1">{item.unit}</span>}
+            </span>
+        );
+    };
+
+    let globalIndex = 0; // For flattened indexing during render? 
+    // Actually we iterate SECTIONS to render structure, but we need to match the flatList index for highlighting.
+    // The visual structure is Hierarchical (Section -> Item -> [Option]), but navigation is Flat.
+    // We can map over the flatList to render? 
+    // BUT we want to keep the Section Headers visible.
+    // So we should iterate SECTIONS, and for each item, check if it expands, then render options.
+    // We need to maintain a running counter `renderIndex` to match `selectedIndex`.
+
+    let renderIndex = 0;
 
     return (
         <div className="w-full mt-4 animate-in fade-in slide-in-from-top-2 flex-1 min-h-0 flex flex-col">
-            <div className="border border-white/10 rounded-lg p-6 font-mono text-sm overflow-y-auto w-full custom-scrollbar-hide flex-1">
+            <div
+                className="border p-6 font-mono text-sm overflow-y-auto w-full custom-scrollbar-hide flex-1 rounded-lg"
+                ref={listRef}
+                style={{ borderColor: 'var(--surface-color)' }}
+            >
                 {SECTIONS.map((section) => (
                     <div key={section.title} className="mb-8 last:mb-0">
-                        <div className="text-white/30 mb-4 text-xs">// {section.title}</div>
+                        <div className="mb-4 text-xs" style={{ color: 'var(--muted-color)' }}>// {section.title}</div>
                         <div className="space-y-1">
                             {section.items.map((item) => {
-                                const currentIndex = globalIndex++;
-                                const isSelected = currentIndex === selectedIndex;
+                                const myIndex = renderIndex++;
+                                const isSelected = selectedIndex === myIndex;
+                                const isExpanded = expanded.has(item.key);
 
-                                return (
+                                const itemElement = (
                                     <div
                                         key={item.key}
-                                        ref={el => itemRefs.current[currentIndex] = el}
-                                        onClick={() => setSelectedIndex(currentIndex)}
-                                        className={clsx(
-                                            "group flex items-center py-1 px-4 -mx-4 rounded cursor-pointer transition-colors duration-200",
-                                            isSelected ? "bg-white/10" : "hover:bg-white/5"
-                                        )}
+                                        ref={el => itemRefs.current[myIndex] = el}
+                                        onClick={() => {
+                                            if (editingKey !== item.key) setSelectedIndex(myIndex);
+                                            if (item.type === 'action') onUpdateSettings?.(item.key);
+                                        }}
+                                        className="group flex items-center py-1 px-4 -mx-4 rounded cursor-pointer transition-colors duration-200"
+                                        style={{
+                                            backgroundColor: isSelected ? 'var(--surface-color)' : 'transparent'
+                                        }}
                                     >
-                                        <span className={clsx(
-                                            "w-4 mr-2 text-white/50 transition-opacity",
-                                            isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                                        )}>
+                                        <span
+                                            className={clsx(
+                                                "w-4 mr-2 transition-opacity",
+                                                isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                            )}
+                                            style={{ color: 'var(--muted-color)' }}
+                                        >
                                             {'>'}
                                         </span>
-                                        <span className="text-white/60 mr-2">"{item.key}"</span>
-                                        <span className="text-white/30 mr-4">:</span>
+                                        <span className="mr-2" style={{ color: isSelected ? 'var(--text-color)' : 'var(--muted-color)' }}>
+                                            "{item.key}"
+                                        </span>
+                                        <span className="mr-4" style={{ color: 'var(--muted-color)' }}>:</span>
 
                                         {item.type === 'action' ? (
                                             <span className="text-red-400">"{item.key}"</span>
-                                        ) : (
-                                            <span className="text-white/80">
-                                                <span className={item.type === 'boolean' ? 'text-red-400' : 'text-blue-300'}>
-                                                    "{item.value}"
-                                                </span>
-                                                {item.unit && <span className="text-white/40 ml-1">{item.unit}</span>}
-                                            </span>
-                                        )}
+                                        ) : renderValue(item)}
                                     </div>
+                                );
+
+                                const optionElements = [];
+                                if (isExpanded && item.options) {
+                                    item.options.forEach(opt => {
+                                        const optIndex = renderIndex++;
+                                        const isOptSelected = selectedIndex === optIndex;
+                                        const isCurrentValue = values[item.key] === opt;
+
+                                        optionElements.push(
+                                            <div
+                                                key={`${item.key}-opt-${opt}`}
+                                                ref={el => itemRefs.current[optIndex] = el}
+                                                onClick={() => {
+                                                    // Select option, close dropdown, and focus back on parent item
+                                                    onUpdateSettings?.(item.key, opt);
+                                                    setExpanded(new Set());
+                                                    const parentIdx = flatList.findIndex(x => x.key === item.key);
+                                                    if (parentIdx !== -1) setSelectedIndex(parentIdx);
+                                                }}
+                                                onMouseEnter={() => setSelectedIndex(optIndex)}
+                                                className="flex items-center py-1 px-4 -mx-4 rounded cursor-pointer transition-colors duration-200"
+                                                style={{
+                                                    backgroundColor: isOptSelected ? 'var(--surface-color)' : 'transparent'
+                                                }}
+                                            >
+                                                {/* Indentation spacer */}
+                                                <span className="w-4 mr-2"></span>
+                                                <span className="w-[calc(100%-1.5rem)] text-center">
+                                                    <span
+                                                        className={clsx(
+                                                            isCurrentValue ? "text-green-400" : "",
+                                                        )}
+                                                        style={{
+                                                            color: isCurrentValue ? undefined : (isOptSelected ? 'var(--text-color)' : 'var(--muted-color)')
+                                                        }}
+                                                    >
+                                                        {opt}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                        );
+                                    });
+                                }
+
+                                return (
+                                    <React.Fragment key={item.key}>
+                                        {itemElement}
+                                        {optionElements}
+                                    </React.Fragment>
                                 );
                             })}
                         </div>

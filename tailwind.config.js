@@ -17,6 +17,13 @@ export default {
                 'gradient-conic':
                     'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
             },
+            borderRadius: {
+                lg: 'var(--border-radius)',
+                DEFAULT: 'var(--border-radius)',
+            },
+            borderWidth: {
+                DEFAULT: 'var(--border-width)',
+            }
         },
     },
     plugins: [],

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../db';
 
-const NoteEditor = ({ onExit, initialNoteId }) => {
+const NoteEditor = ({ onExit, initialNoteId, settings }) => {
     const [content, setContent] = useState('');
     const [noteId, setNoteId] = useState(null);
     const textareaRef = useRef(null);
@@ -72,7 +72,11 @@ const NoteEditor = ({ onExit, initialNoteId }) => {
                 onChange={handleChange}
                 onKeyDown={handleKeyDown}
                 placeholder="Start writing..."
-                className="w-full max-w-3xl h-full bg-transparent text-white/90 text-lg resize-none outline-none font-mono"
+                className="w-full max-w-3xl h-full bg-transparent text-white/90 resize-none outline-none"
+                style={{
+                    fontFamily: settings?.editor_font || 'inherit',
+                    fontSize: settings?.editor_font_size ? `${settings.editor_font_size}px` : 'inherit'
+                }}
                 spellCheck="false"
             />
             <div className="absolute bottom-6 right-8 text-xs text-white/20 font-mono">
