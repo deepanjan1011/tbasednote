@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; // React imported for Fragment
 import { clsx } from 'clsx';
 import { SECTIONS } from '../config/settings';
+
+const EMPTY_OBJ = {};
 
 const SettingsView = ({ settings, onUpdateSettings }) => {
     // Local state fallback if main app isn't ready (though we will update app next)
@@ -15,7 +17,7 @@ const SettingsView = ({ settings, onUpdateSettings }) => {
     const inputRef = useRef(null);
 
     // Use settings from props, or empty object if not provided (should be provided)
-    const values = settings || {};
+    const values = settings || EMPTY_OBJ;
 
     // Generate flat list
     const flatList = React.useMemo(() => {
@@ -44,7 +46,7 @@ const SettingsView = ({ settings, onUpdateSettings }) => {
             });
         });
         return list;
-    }, [expanded, values]); // Re-calc if expansion changes
+    }, [expanded]); // Re-calc if expansion changes
 
     // Reset refs array when list changes size
     useEffect(() => {
@@ -59,82 +61,72 @@ const SettingsView = ({ settings, onUpdateSettings }) => {
     }, [editingKey]);
 
     // 3. Keyboard Handling
-    useEffect(() => {
+    // Refactored to use local handler instead of window listener to prevent event bleeding
+    const handleKeyDown = (e) => {
         if (editingKey) return; // Disable nav while editing
 
-        const handleKeyDown = (e) => {
-            if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                setSelectedIndex(prev => {
-                    const next = prev - 1;
-                    if (expanded.size > 0) {
-                        // Find the expanded group bounds
-                        // Since we force single expansion, we can find the bounds of the current group
-                        // But we need to know WHICH group we are in?
-                        // If we are locked, we assume we are at or below the parent.
-                        // Actually, simpler: find the expanded item index.
-                        const expandedKey = Array.from(expanded)[0];
-                        const parentIndex = flatList.findIndex(x => x.key === expandedKey);
-                        if (parentIndex !== -1 && next < parentIndex) return prev; // Block going above parent
-                    }
-                    return Math.max(0, next);
-                });
-            } else if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                setSelectedIndex(prev => {
-                    const next = prev + 1;
-                    if (expanded.size > 0) {
-                        const expandedKey = Array.from(expanded)[0];
-                        const parentIndex = flatList.findIndex(x => x.key === expandedKey);
-                        // Find number of options
-                        // We can look at flatList sequence
-                        // The items after parentIndex should be options with parentKey === expandedKey
-                        let endIndex = parentIndex;
-                        while (endIndex + 1 < flatList.length && flatList[endIndex + 1].parentKey === expandedKey) {
-                            endIndex++;
-                        }
-                        if (next > endIndex) return prev; // Block going below last option
-                    }
-                    return Math.min(flatList.length - 1, next);
-                });
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
-                const current = flatList[selectedIndex];
-                if (!current) return;
-
-                if (current.type === 'item') {
-                    const item = current.data;
-                    if (item.type === 'boolean') {
-                        onUpdateSettings?.(item.key, values[item.key] === 'true' ? 'false' : 'true');
-                    } else if (item.type === 'select') {
-                        // Toggle expansion
-                        // Toggle expansion (Accordion style - close others)
-                        setExpanded(prev => {
-                            const next = new Set();
-                            if (!prev.has(item.key)) next.add(item.key);
-                            return next;
-                        });
-                    } else if (item.type === 'text' || item.type === 'number') {
-                        // Start editing
-                        setEditingKey(item.key);
-                        setEditValue(values[item.key]);
-                    } else if (item.type === 'action') {
-                        onUpdateSettings?.(item.key);
-                    }
-                } else if (current.type === 'option') {
-                    // Select option
-                    onUpdateSettings?.(current.parentKey, current.value);
-                    setExpanded(new Set()); // Close after selection
-                    // Move cursor back to parent item
-                    const parentIdx = flatList.findIndex(x => x.key === current.parentKey);
-                    if (parentIdx !== -1) setSelectedIndex(parentIdx);
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedIndex(prev => {
+                const next = prev - 1;
+                if (expanded.size > 0) {
+                    const expandedKey = Array.from(expanded)[0];
+                    const parentIndex = flatList.findIndex(x => x.key === expandedKey);
+                    if (parentIndex !== -1 && next < parentIndex) return prev;
                 }
-            }
-        };
+                return Math.max(0, next);
+            });
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedIndex(prev => {
+                const next = prev + 1;
+                if (expanded.size > 0) {
+                    const expandedKey = Array.from(expanded)[0];
+                    const parentIndex = flatList.findIndex(x => x.key === expandedKey);
+                    let endIndex = parentIndex;
+                    while (endIndex + 1 < flatList.length && flatList[endIndex + 1].parentKey === expandedKey) {
+                        endIndex++;
+                    }
+                    if (next > endIndex) return prev;
+                }
+                return Math.min(flatList.length - 1, next);
+            });
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const current = flatList[selectedIndex];
+            if (!current) return;
 
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [flatList, selectedIndex, editingKey, values, onUpdateSettings]);
+            if (current.type === 'item') {
+                const item = current.data;
+                if (item.type === 'boolean') {
+                    onUpdateSettings?.(item.key, values[item.key] === 'true' ? 'false' : 'true');
+                } else if (item.type === 'select') {
+                    setExpanded(prev => {
+                        const next = new Set();
+                        if (!prev.has(item.key)) next.add(item.key);
+                        return next;
+                    });
+                } else if (item.type === 'text' || item.type === 'number') {
+                    setEditingKey(item.key);
+                    setEditValue(values[item.key]);
+                } else if (item.type === 'action') {
+                    onUpdateSettings?.(item.key);
+                }
+            } else if (current.type === 'option') {
+                onUpdateSettings?.(current.parentKey, current.value);
+                setExpanded(new Set());
+                const parentIdx = flatList.findIndex(x => x.key === current.parentKey);
+                if (parentIdx !== -1) setSelectedIndex(parentIdx);
+            }
+        }
+    };
+
+    // Auto-focus the list on mount
+    useEffect(() => {
+        if (!editingKey) {
+            listRef.current?.focus();
+        }
+    }, [editingKey]);
 
     // Scroll active item into view
     useEffect(() => {
@@ -151,15 +143,16 @@ const SettingsView = ({ settings, onUpdateSettings }) => {
             e.stopPropagation();
             onUpdateSettings?.(key, editValue);
             setEditingKey(null);
+            // Re-focus list after editing
+            setTimeout(() => listRef.current?.focus(), 0);
         } else if (e.key === 'Escape') {
             e.preventDefault();
             setEditingKey(null);
+            setTimeout(() => listRef.current?.focus(), 0);
         }
     };
 
-    // Helper to render value with color
     const renderValue = (item) => {
-        // If editing this item
         if (editingKey === item.key) {
             return (
                 <input
@@ -169,7 +162,6 @@ const SettingsView = ({ settings, onUpdateSettings }) => {
                     onChange={(e) => setEditValue(e.target.value)}
                     onKeyDown={(e) => handleInputKeyDown(e, item.key)}
                     onBlur={() => {
-                        // Optional: save on blur or cancel? Let's save.
                         onUpdateSettings?.(item.key, editValue);
                         setEditingKey(null);
                     }}
@@ -178,6 +170,7 @@ const SettingsView = ({ settings, onUpdateSettings }) => {
                         color: 'var(--text-color)',
                         borderColor: 'var(--muted-color)'
                     }}
+                    autoFocus
                 />
             );
         }
@@ -190,32 +183,26 @@ const SettingsView = ({ settings, onUpdateSettings }) => {
 
         return (
             <span style={{ color: 'var(--text-color)', opacity: 0.8 }}>
-                <span className={colorClass}>"{val}"</span>
+                <span className={colorClass}>&quot;{val}&quot;</span>
                 {item.unit && <span style={{ color: 'var(--muted-color)' }} className="ml-1">{item.unit}</span>}
             </span>
         );
     };
-
-    let globalIndex = 0; // For flattened indexing during render? 
-    // Actually we iterate SECTIONS to render structure, but we need to match the flatList index for highlighting.
-    // The visual structure is Hierarchical (Section -> Item -> [Option]), but navigation is Flat.
-    // We can map over the flatList to render? 
-    // BUT we want to keep the Section Headers visible.
-    // So we should iterate SECTIONS, and for each item, check if it expands, then render options.
-    // We need to maintain a running counter `renderIndex` to match `selectedIndex`.
 
     let renderIndex = 0;
 
     return (
         <div className="w-full mt-4 animate-in fade-in slide-in-from-top-2 flex-1 min-h-0 flex flex-col">
             <div
-                className="border p-6 font-mono text-sm overflow-y-auto w-full custom-scrollbar-hide flex-1 rounded-lg"
+                className="border p-6 font-mono text-sm overflow-y-auto w-full custom-scrollbar-hide flex-1 rounded-lg outline-none focus:ring-1 focus:ring-white/10"
                 ref={listRef}
                 style={{ borderColor: 'var(--surface-color)' }}
+                tabIndex={-1}
+                onKeyDown={handleKeyDown}
             >
                 {SECTIONS.map((section) => (
                     <div key={section.title} className="mb-8 last:mb-0">
-                        <div className="mb-4 text-xs" style={{ color: 'var(--muted-color)' }}>// {section.title}</div>
+                        <div className="mb-4 text-xs" style={{ color: 'var(--muted-color)' }}>{`// ${section.title}`}</div>
                         <div className="space-y-1">
                             {section.items.map((item) => {
                                 const myIndex = renderIndex++;
@@ -245,12 +232,12 @@ const SettingsView = ({ settings, onUpdateSettings }) => {
                                             {'>'}
                                         </span>
                                         <span className="mr-2" style={{ color: isSelected ? 'var(--text-color)' : 'var(--muted-color)' }}>
-                                            "{item.key}"
+                                            &quot;{item.key}&quot;
                                         </span>
                                         <span className="mr-4" style={{ color: 'var(--muted-color)' }}>:</span>
 
                                         {item.type === 'action' ? (
-                                            <span className="text-red-400">"{item.key}"</span>
+                                            <span className="text-red-400">&quot;{item.key}&quot;</span>
                                         ) : renderValue(item)}
                                     </div>
                                 );

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { db } from './db';
 import CommandBar from './components/CommandBar';
 import NoteEditor from './components/NoteEditor';
 import NoteList from './components/NoteList';
@@ -84,7 +85,7 @@ function App() {
     useEffect(() => {
         const handleGlobalKeyDown = (e) => {
             if (e.key === 'Escape') {
-                if (['CONF', 'HELP', 'LIST', 'AUTH'].includes(mode)) {
+                if (['CONF', 'HELP', 'LIST', 'AUTH', 'PHILOSOPHY', 'JOKE'].includes(mode)) {
                     setMode('ROOT');
                     setSearchTerm('');
                     setInputVal(''); // Clear input on escape
@@ -122,6 +123,23 @@ function App() {
             setMode('AUTH');
         } else if (cmd === '/conf') {
             setMode('CONF');
+        } else if (cmd === '/export') {
+            setStatusMsg('exporting...');
+            db.notes.toArray().then(notes => {
+                const blob = new Blob([JSON.stringify(notes, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `vylite-notes-${new Date().toISOString().slice(0, 10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                setStatusMsg('exported!');
+                setTimeout(() => setStatusMsg(''), 2000);
+            });
+        } else if (cmd === '/vylite') {
+            setMode('PHILOSOPHY');
+        } else if (cmd === '/joke') {
+            setMode('JOKE');
         } else if (cmd === 'BACKSPACE_EMPTY') {
             if (mode !== 'ROOT') {
                 setMode('ROOT');
@@ -316,7 +334,7 @@ function App() {
                                         </div>
                                         <div className="flex items-center gap-3">
                                             <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/vylite</span>
-                                            <span>vylite's philosophy</span>
+                                            <span>vylite&apos;s philosophy</span>
                                         </div>
                                     </div>
                                 </div>
@@ -329,6 +347,39 @@ function App() {
                                             <span>get a random joke</span>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {mode === 'PHILOSOPHY' && (
+                            <div className="mt-12 max-w-md text-center animate-in fade-in zoom-in-95 leading-relaxed space-y-6">
+                                <h2 className="text-xl font-bold tracking-tight">The Vylite Philosophy</h2>
+                                <p className="text-sm opacity-80">
+                                    Simplicity is the ultimate sophistication.
+                                </p>
+                                <p className="text-sm opacity-80">
+                                    We believe in tools that disappear, leaving only you and your thoughts.
+                                    No distractions, no clutter, just the void and your creativity.
+                                </p>
+                                <div className="pt-8 text-xs opacity-50 font-mono">
+                                    press esc to return
+                                </div>
+                            </div>
+                        )}
+
+                        {mode === 'JOKE' && (
+                            <div className="mt-20 max-w-md text-center animate-in fade-in zoom-in-95">
+                                <div className="text-4xl mb-6">👻</div>
+                                <p className="text-lg font-medium leading-relaxed mb-8">
+                                    {[
+                                        "Why do programmers prefer dark mode? Because light attracts bugs.",
+                                        "How many programmers does it take to change a light bulb? None, that's a hardware problem.",
+                                        "I told a joke about UDP... but you probably didn't get it.",
+                                        "A SQL query walks into a bar, walks up to two tables and asks... 'Can I join you?'"
+                                    ][Math.floor(Math.random() * 4)]}
+                                </p>
+                                <div className="text-xs opacity-50 font-mono">
+                                    press esc to return
                                 </div>
                             </div>
                         )}

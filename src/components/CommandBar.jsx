@@ -1,12 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-export function cn(...inputs) {
-    return twMerge(clsx(inputs));
-}
+import { useState, useRef, useEffect } from 'react';
+import { cn } from '../lib/utils';
 
 const CommandBar = ({ onCommand, onSearch, value, onChange, placeholder }) => {
+    // eslint-disable-next-line no-unused-vars
     const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef(null);
 
@@ -27,6 +23,7 @@ const CommandBar = ({ onCommand, onSearch, value, onChange, placeholder }) => {
 
     const handleKeyDown = (e) => {
         if (e.key === 'Enter') {
+            e.preventDefault();
             if (value.startsWith('/')) {
                 onCommand?.(value);
             } else {

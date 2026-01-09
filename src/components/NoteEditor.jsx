@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { db } from '../db';
 
 const NoteEditor = ({ onExit, initialNoteId, settings }) => {
@@ -65,21 +65,34 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-[#0D0D0D] flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-200">
-            <textarea
-                ref={textareaRef}
-                value={content}
-                onChange={handleChange}
-                onKeyDown={handleKeyDown}
-                placeholder="Start writing..."
-                className="w-full max-w-3xl h-full bg-transparent text-white/90 resize-none outline-none"
+        <div className="fixed inset-0 flex flex-col items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200"
+            style={{ backgroundColor: 'var(--bg-color)' }}
+        >
+            <div
+                className="w-full max-w-4xl h-[75vh] border shadow-2xl flex flex-col p-8 relative"
                 style={{
-                    fontFamily: settings?.editor_font || 'inherit',
-                    fontSize: settings?.editor_font_size ? `${settings.editor_font_size}px` : 'inherit'
+                    backgroundColor: 'var(--surface-color)', // key for the "card" look
+                    borderColor: 'var(--border-color)',
+                    borderRadius: '1rem'
                 }}
-                spellCheck="false"
-            />
-            <div className="absolute bottom-6 right-8 text-xs text-white/20 font-mono">
+            >
+                <textarea
+                    ref={textareaRef}
+                    value={content}
+                    onChange={handleChange}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Start typing..."
+                    className="w-full h-full bg-transparent resize-none outline-none"
+                    style={{
+                        fontFamily: settings?.editor_font || 'inherit',
+                        fontSize: settings?.editor_font_size ? `${settings.editor_font_size}px` : 'inherit',
+                        color: 'var(--text-color)'
+                    }}
+                    spellCheck="false"
+                />
+            </div>
+
+            <div className="absolute bottom-6 right-8 text-xs font-mono" style={{ color: 'var(--muted-color)' }}>
                 esc to exit <span className="mx-2">|</span> ctrl+d to delete
             </div>
         </div>
