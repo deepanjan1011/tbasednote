@@ -45,12 +45,15 @@ function App() {
             root.style.setProperty('--stripe-color', 'rgba(255,255,255,0.03)'); // Subtle white tint
             root.style.setProperty('--muted-color', 'rgba(255,255,255,0.5)');
         } else {
-            // Velvet (Void default)
-            root.style.setProperty('--bg-color', '#0D0D0D');
-            root.style.setProperty('--text-color', '#ffffff');
-            root.style.setProperty('--border-color', 'rgba(255,255,255,0.1)');
-            root.style.setProperty('--surface-color', 'rgba(255,255,255,0.1)');
-            root.style.setProperty('--muted-color', 'rgba(255,255,255,0.5)');
+
+
+            // Velvet (Void default) - High Visibility Refinement
+            root.style.setProperty('--bg-color', '#1E1113');
+            root.style.setProperty('--text-color', '#EBD9DD');
+            root.style.setProperty('--border-color', '#593238');
+            root.style.setProperty('--surface-color', '#2D181C');
+            root.style.setProperty('--muted-color', '#9A7A82');
+            root.style.setProperty('--stripe-color', 'rgba(235, 217, 221, 0.05)');
         }
 
         // Apply visual settings (border radius, width, etc)
@@ -186,208 +189,229 @@ function App() {
                 />
             ) : (
                 <div
-                    className="w-full p-4 flex flex-col items-center h-screen transition-all duration-300 ease-in-out"
+                    className="w-full p-4 flex flex-col items-center h-screen transition-all duration-300 ease-in-out justify-center"
                     style={{
-                        paddingTop: settings.margin_top_of_line ? (isNaN(settings.margin_top_of_line) ? settings.margin_top_of_line : `${settings.margin_top_of_line}vh`) : '20vh',
-                        maxWidth: settings.width_of_line ? (isNaN(settings.width_of_line) ? settings.width_of_line : `${settings.width_of_line}rem`) : '600px'
+                        paddingTop: settings.margin_top_of_line ? (isNaN(settings.margin_top_of_line) ? settings.margin_top_of_line : `${settings.margin_top_of_line}vh`) : undefined,
+                        maxWidth: settings.width_of_line ? (isNaN(settings.width_of_line) ? settings.width_of_line : `${settings.width_of_line}rem`) : '600px',
+                        justifyContent: settings.margin_top_of_line ? 'flex-start' : 'center'
                     }}
                 >
 
-                    <div className="w-full mb-2 h-6 text-center text-sm text-green-500 animate-pulse flex-shrink-0">
-                        {statusMsg}
-                    </div>
 
-                    {/* Scrollable Content Container */}
-                    <div className="w-full flex-1 overflow-y-auto custom-scrollbar min-h-0 flex flex-col items-center">
-                        {mode === 'CONF' ? (
-                            <div className="w-full mb-8 animate-in fade-in slide-in-from-top-4 flex-shrink-0">
-                                <div
-                                    className="flex items-center gap-2 p-2 rounded-lg border w-fit"
+                    {mode === 'CONF' ? (
+                        <div className="w-full mb-8 animate-in fade-in slide-in-from-top-4 flex-shrink-0">
+                            <div
+                                className="flex items-center gap-2 p-2 rounded-lg border w-fit"
+                                style={{
+                                    backgroundColor: 'var(--surface-color)',
+                                    borderColor: 'var(--border-color)'
+                                }}
+                            >
+                                <span
+                                    className="px-2 py-1 rounded text-sm font-bold"
                                     style={{
-                                        backgroundColor: 'var(--surface-color)',
-                                        borderColor: 'var(--border-color)'
+                                        backgroundColor: 'var(--muted-color)',
+                                        color: 'var(--text-color)'
                                     }}
-                                >
-                                    <span
-                                        className="px-2 py-1 rounded text-sm font-bold"
-                                        style={{
-                                            backgroundColor: 'var(--muted-color)',
-                                            color: 'var(--text-color)'
-                                        }}
-                                    >/conf</span>
-                                </div>
-                                <div className="text-right text-xs mt-1" style={{ color: 'var(--muted-color)' }}>esc or backspace to exit</div>
+                                >/conf</span>
                             </div>
-                        ) : (
-                            <CommandBar
-                                value={inputVal}
-                                onChange={setInputVal}
-                                onCommand={handleCommand}
-                                onSearch={handleSearch}
-                                placeholder={settings.placeholder_text}
+                            <div className="text-right text-xs mt-1" style={{ color: 'var(--muted-color)' }}>esc or backspace to exit</div>
+                        </div>
+                    ) : (
+                        <div
+                            className="w-full max-w-2xl p-8 rounded-2xl border shadow-xl transition-all duration-300 relative mb-8"
+                            style={{
+                                backgroundColor: 'var(--surface-color)',
+                                borderColor: 'var(--border-color)'
+                            }}
+                        >
+                            {statusMsg ? (
+                                <div className="font-mono animate-in fade-in slide-in-from-bottom-2">
+                                    <div className="text-xl mb-3 text-blue-400 font-bold">{inputVal || (statusMsg.includes('creating') ? '/c' : '/')}</div>
+                                    <div className="text-sm opacity-70 flex items-center gap-2">
+                                        <span className="text-blue-400">&gt;</span>
+                                        {statusMsg}
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <CommandBar
+                                        value={inputVal}
+                                        onChange={setInputVal}
+                                        onCommand={handleCommand}
+                                        onSearch={handleSearch}
+                                        placeholder={settings.placeholder_text}
+                                    />
+
+                                    {mode === 'ROOT' && !searchTerm && settings.show_commands_on_homepage !== 'false' && (
+                                        <>
+                                            <div
+                                                className="w-full h-px my-6"
+                                                style={{ backgroundColor: 'var(--border-color)' }}
+                                            />
+                                            <div className="flex gap-4 w-full animate-in fade-in slide-in-from-top-2 flex-shrink-0 flex-wrap">
+                                                <div
+                                                    className="flex items-center gap-3 px-3 py-2 rounded-lg border text-xs transition-colors hover:bg-white/5 cursor-pointer"
+                                                    style={{ borderColor: 'var(--border-color)' }}
+                                                    onClick={() => { setInputVal('/c'); handleCommand('/c'); }}
+                                                >
+                                                    <span
+                                                        className="px-1.5 py-0.5 rounded font-bold font-mono"
+                                                        style={{ backgroundColor: 'var(--muted-color)', color: 'var(--text-color)' }}
+                                                    >/c</span>
+                                                    <span style={{ color: 'var(--muted-color)' }}>create new note</span>
+                                                </div>
+                                                <div
+                                                    className="flex items-center gap-3 px-3 py-2 rounded-lg border text-xs transition-colors hover:bg-white/5 cursor-pointer"
+                                                    style={{ borderColor: 'var(--border-color)' }}
+                                                    onClick={() => { setInputVal('/a'); handleCommand('/a'); }}
+                                                >
+                                                    <span
+                                                        className="px-1.5 py-0.5 rounded font-bold font-mono"
+                                                        style={{ backgroundColor: 'var(--muted-color)', color: 'var(--text-color)' }}
+                                                    >/a</span>
+                                                    <span style={{ color: 'var(--muted-color)' }}>view all notes</span>
+                                                </div>
+                                                <div
+                                                    className="flex items-center gap-3 px-3 py-2 rounded-lg border text-xs transition-colors hover:bg-white/5 cursor-pointer"
+                                                    style={{ borderColor: 'var(--border-color)' }}
+                                                    onClick={() => { setInputVal('/h'); handleCommand('/h'); }}
+                                                >
+                                                    <span
+                                                        className="px-1.5 py-0.5 rounded font-bold font-mono"
+                                                        style={{ backgroundColor: 'var(--muted-color)', color: 'var(--text-color)' }}
+                                                    >/h</span>
+                                                    <span style={{ color: 'var(--muted-color)' }}>show commands</span>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    {mode === 'ROOT' && !searchTerm && settings.show_recent_notes_on_homepage === 'true' && (
+                        <div className="w-full mt-8">
+                            <div className="text-xs mb-2 font-mono" style={{ color: 'var(--muted-color)' }}>RECENT</div>
+                            <NoteList
+                                onSelectNote={handleSelectNote}
+                                settings={settings}
+                                limit={3}
                             />
-                        )}
+                        </div>
+                    )}
 
-                        {mode === 'ROOT' && !searchTerm && (
-                            <>
-                                {settings.show_commands_on_homepage !== 'false' && (
-                                    <div className="mt-4 flex gap-4 w-full animate-in fade-in slide-in-from-top-2 flex-shrink-0">
-                                        <div
-                                            className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs"
-                                            style={{ borderColor: 'var(--border-color)' }}
-                                        >
-                                            <span
-                                                className="px-1.5 py-0.5 rounded font-medium"
-                                                style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}
-                                            >/c</span>
-                                            <span style={{ color: 'var(--muted-color)' }}>create new note</span>
-                                        </div>
-                                        <div
-                                            className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs"
-                                            style={{ borderColor: 'var(--border-color)' }}
-                                        >
-                                            <span
-                                                className="px-1.5 py-0.5 rounded font-medium"
-                                                style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}
-                                            >/a</span>
-                                            <span style={{ color: 'var(--muted-color)' }}>view all notes</span>
-                                        </div>
-                                        <div
-                                            className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs"
-                                            style={{ borderColor: 'var(--border-color)' }}
-                                        >
-                                            <span
-                                                className="px-1.5 py-0.5 rounded font-medium"
-                                                style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}
-                                            >/h</span>
-                                            <span style={{ color: 'var(--muted-color)' }}>show commands</span>
-                                        </div>
+                    {mode === 'LIST' && (
+                        <NoteList searchTerm={searchTerm} onSelectNote={handleSelectNote} settings={settings} />
+                    )}
+
+                    {mode === 'CONF' && (
+                        <SettingsView settings={settings} onUpdateSettings={handleUpdateSettings} />
+                    )}
+
+                    {mode === 'HELP' && (
+                        <div className="mt-8 w-full text-sm text-white/60 animate-in fade-in slide-in-from-bottom-4 space-y-6 pb-20">
+                            <div>
+                                <h3 className="mb-2 text-xs text-white/30 tracking-wider">CORE</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/c</span>
+                                        <span>create new note</span>
                                     </div>
-                                )}
-                                {settings.show_recent_notes_on_homepage === 'true' && (
-                                    <div className="w-full mt-8">
-                                        <div className="text-xs mb-2 font-mono" style={{ color: 'var(--muted-color)' }}>RECENT</div>
-                                        <NoteList
-                                            onSelectNote={handleSelectNote}
-                                            settings={settings}
-                                            limit={3}
-                                        />
-                                    </div>
-                                )}
-                            </>
-                        )}
-
-                        {mode === 'LIST' && (
-                            <NoteList searchTerm={searchTerm} onSelectNote={handleSelectNote} settings={settings} />
-                        )}
-
-                        {mode === 'CONF' && (
-                            <SettingsView settings={settings} onUpdateSettings={handleUpdateSettings} />
-                        )}
-
-                        {mode === 'HELP' && (
-                            <div className="mt-8 w-full text-sm text-white/60 animate-in fade-in slide-in-from-bottom-4 space-y-6 pb-20">
-                                <div>
-                                    <h3 className="mb-2 text-xs text-white/30 tracking-wider">CORE</h3>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="flex items-center gap-3">
-                                            <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/c</span>
-                                            <span>create new note</span>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/a</span>
-                                            <span>view all notes</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <h3 className="mb-2 text-xs text-white/30 tracking-wider">SETTINGS</h3>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="flex items-center gap-3">
-                                            <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/acc</span>
-                                            <span>account details</span>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/conf</span>
-                                            <span>edit configuration</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <h3 className="mb-2 text-xs text-white/30 tracking-wider">TOOLS</h3>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="flex items-center gap-3">
-                                            <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/export</span>
-                                            <span>export notes</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <h3 className="mb-2 text-xs text-white/30 tracking-wider">META</h3>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="flex items-center gap-3">
-                                            <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/h</span>
-                                            <span>hide commands</span>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/vylite</span>
-                                            <span>vylite&apos;s philosophy</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <h3 className="mb-2 text-xs text-white/30 tracking-wider">OTHERS</h3>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="flex items-center gap-3">
-                                            <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/joke</span>
-                                            <span>get a random joke</span>
-                                        </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/a</span>
+                                        <span>view all notes</span>
                                     </div>
                                 </div>
                             </div>
-                        )}
 
-                        {mode === 'PHILOSOPHY' && (
-                            <div className="mt-12 max-w-md text-center animate-in fade-in zoom-in-95 leading-relaxed space-y-6">
-                                <h2 className="text-xl font-bold tracking-tight">The Vylite Philosophy</h2>
-                                <p className="text-sm opacity-80">
-                                    Simplicity is the ultimate sophistication.
-                                </p>
-                                <p className="text-sm opacity-80">
-                                    We believe in tools that disappear, leaving only you and your thoughts.
-                                    No distractions, no clutter, just the void and your creativity.
-                                </p>
-                                <div className="pt-8 text-xs opacity-50 font-mono">
-                                    press esc to return
+                            <div>
+                                <h3 className="mb-2 text-xs text-white/30 tracking-wider">SETTINGS</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/acc</span>
+                                        <span>account details</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/conf</span>
+                                        <span>edit configuration</span>
+                                    </div>
                                 </div>
                             </div>
-                        )}
 
-                        {mode === 'JOKE' && (
-                            <div className="mt-20 max-w-md text-center animate-in fade-in zoom-in-95">
-                                <div className="text-4xl mb-6">👻</div>
-                                <p className="text-lg font-medium leading-relaxed mb-8">
-                                    {[
-                                        "Why do programmers prefer dark mode? Because light attracts bugs.",
-                                        "How many programmers does it take to change a light bulb? None, that's a hardware problem.",
-                                        "I told a joke about UDP... but you probably didn't get it.",
-                                        "A SQL query walks into a bar, walks up to two tables and asks... 'Can I join you?'"
-                                    ][Math.floor(Math.random() * 4)]}
-                                </p>
-                                <div className="text-xs opacity-50 font-mono">
-                                    press esc to return
+                            <div>
+                                <h3 className="mb-2 text-xs text-white/30 tracking-wider">TOOLS</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/export</span>
+                                        <span>export notes</span>
+                                    </div>
                                 </div>
                             </div>
-                        )}
-                    </div>
+
+                            <div>
+                                <h3 className="mb-2 text-xs text-white/30 tracking-wider">META</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/h</span>
+                                        <span>hide commands</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/vylite</span>
+                                        <span>vylite&apos;s philosophy</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h3 className="mb-2 text-xs text-white/30 tracking-wider">OTHERS</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/joke</span>
+                                        <span>get a random joke</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {mode === 'PHILOSOPHY' && (
+                        <div className="mt-12 max-w-md text-center animate-in fade-in zoom-in-95 leading-relaxed space-y-6">
+                            <h2 className="text-xl font-bold tracking-tight">The Vylite Philosophy</h2>
+                            <p className="text-sm opacity-80">
+                                Simplicity is the ultimate sophistication.
+                            </p>
+                            <p className="text-sm opacity-80">
+                                We believe in tools that disappear, leaving only you and your thoughts.
+                                No distractions, no clutter, just the void and your creativity.
+                            </p>
+                            <div className="pt-8 text-xs opacity-50 font-mono">
+                                press esc to return
+                            </div>
+                        </div>
+                    )}
+
+                    {mode === 'JOKE' && (
+                        <div className="mt-20 max-w-md text-center animate-in fade-in zoom-in-95">
+                            <div className="text-4xl mb-6">👻</div>
+                            <p className="text-lg font-medium leading-relaxed mb-8">
+                                {[
+                                    "Why do programmers prefer dark mode? Because light attracts bugs.",
+                                    "How many programmers does it take to change a light bulb? None, that's a hardware problem.",
+                                    "I told a joke about UDP... but you probably didn't get it.",
+                                    "A SQL query walks into a bar, walks up to two tables and asks... 'Can I join you?'"
+                                ][Math.floor(Math.random() * 4)]}
+                            </p>
+                            <div className="text-xs opacity-50 font-mono">
+                                press esc to return
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
-    )
+    );
 }
 
 export default App;

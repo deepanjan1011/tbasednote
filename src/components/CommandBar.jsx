@@ -47,7 +47,7 @@ const CommandBar = ({ onCommand, onSearch, value, onChange, placeholder }) => {
                 onBlur={() => setIsFocused(false)}
                 placeholder={placeholder || "Search or command..."}
                 className={cn(
-                    "w-full bg-transparent text-lg outline-none border-b py-2 transition-all duration-300 placeholder-[var(--muted-color)]",
+                    "w-full bg-transparent text-lg outline-none py-2 transition-all duration-300 placeholder-[var(--muted-color)]",
                 )}
                 style={{
                     color: 'var(--text-color)',
