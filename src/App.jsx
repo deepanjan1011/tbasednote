@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from './db';
+import { fetchJoke } from './lib/gemini';
 import CommandBar from './components/CommandBar';
 import NoteEditor from './components/NoteEditor';
 import NoteList from './components/NoteList';
@@ -14,6 +15,7 @@ function App() {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeNoteId, setActiveNoteId] = useState(null);
     const [inputVal, setInputVal] = useState('');
+    const [jokeText, setJokeText] = useState('');
 
     // Settings State
     const [settings, setSettings] = useState(getInitialSettings());
@@ -27,9 +29,6 @@ function App() {
         root.classList.remove('theme-light', 'theme-dark', 'theme-velvet');
 
         // Apply theme class (assuming we set these up in CSS, or just handle styles manually here)
-        // For now, let's use the 'theme' value.
-        // User requested "Velvet", "Dark", "Light".
-        // Default is Velvet.
         if (settings.theme === 'light') {
             root.style.setProperty('--bg-color', '#F7F5F0'); // Warm beige
             root.style.setProperty('--text-color', '#1A1A1A');
@@ -45,8 +44,6 @@ function App() {
             root.style.setProperty('--stripe-color', 'rgba(255,255,255,0.03)'); // Subtle white tint
             root.style.setProperty('--muted-color', 'rgba(255,255,255,0.5)');
         } else {
-
-
             // Velvet (Void default) - High Visibility Refinement
             root.style.setProperty('--bg-color', '#1E1113');
             root.style.setProperty('--text-color', '#EBD9DD');
@@ -59,14 +56,12 @@ function App() {
         // Apply visual settings (border radius, width, etc)
         const formatValue = (val, unit) => {
             if (!val) return '0';
-            // If value already has non-numeric chars (like 'px', 'rem'), use it as is
             if (isNaN(val)) return val;
             return `${val}${unit}`;
         };
 
         root.style.setProperty('--border-radius', formatValue(settings.border_radius, 'rem'));
         root.style.setProperty('--border-width', formatValue(settings.border_width, 'px'));
-        // ... other settings can be applied here or used in components via props
 
     }, [settings]);
 
@@ -80,8 +75,6 @@ function App() {
             [key]: value
         }));
     };
-
-    // ... (rest of code) ...
 
 
     // Global Key Handler for Navigation
@@ -143,6 +136,11 @@ function App() {
             setMode('PHILOSOPHY');
         } else if (cmd === '/joke') {
             setMode('JOKE');
+            setJokeText('thinking...');
+            fetchJoke().then(joke => setJokeText(joke)).catch((err) => {
+                console.error('Joke fetch error:', err);
+                setJokeText('Failed to fetch joke. Please check your API key.');
+            });
         } else if (cmd === 'BACKSPACE_EMPTY') {
             if (mode !== 'ROOT') {
                 setMode('ROOT');
@@ -396,12 +394,7 @@ function App() {
                         <div className="mt-20 max-w-md text-center animate-in fade-in zoom-in-95">
                             <div className="text-4xl mb-6">👻</div>
                             <p className="text-lg font-medium leading-relaxed mb-8">
-                                {[
-                                    "Why do programmers prefer dark mode? Because light attracts bugs.",
-                                    "How many programmers does it take to change a light bulb? None, that's a hardware problem.",
-                                    "I told a joke about UDP... but you probably didn't get it.",
-                                    "A SQL query walks into a bar, walks up to two tables and asks... 'Can I join you?'"
-                                ][Math.floor(Math.random() * 4)]}
+                                {jokeText}
                             </p>
                             <div className="text-xs opacity-50 font-mono">
                                 press esc to return
