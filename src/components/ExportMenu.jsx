@@ -16,6 +16,21 @@ const ExportMenu = ({ onClose }) => {
     const [selectedFormatLabel, setSelectedFormatLabel] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
 
+    // Gating for initial render to prevent "ghost" Enter key presses
+    const [interactionReady, setInteractionReady] = useState(false);
+
+    // Force reset on mount to ensure we always start at selection
+    useEffect(() => {
+        setStage('selection');
+        setGeneratedFile(null);
+        setFileName('');
+        setIsGenerating(false);
+
+        // Small delay before accepting input
+        const timer = setTimeout(() => setInteractionReady(true), 200);
+        return () => clearTimeout(timer);
+    }, []);
+
     // Options for the first step
     const FORMAT_OPTIONS = [
         { id: 'markdown', label: 'export as markdown' },
@@ -67,6 +82,8 @@ const ExportMenu = ({ onClose }) => {
     };
 
     const handleKeyDown = useCallback((e) => {
+        if (!interactionReady) return;
+
         // Backspace Handling
         if (e.key === 'Backspace') {
             if (stage === 'download') {
@@ -81,6 +98,12 @@ const ExportMenu = ({ onClose }) => {
         }
 
         if (e.key === 'Escape') {
+            if (stage === 'download') {
+                // Return to selection
+                setStage('selection');
+                setGeneratedFile(null);
+                return;
+            }
             onClose();
             return;
         }
@@ -98,7 +121,7 @@ const ExportMenu = ({ onClose }) => {
                 handleDownload();
             }
         }
-    }, [stage, selectedIndex, generatedFile, fileName, onClose]);
+    }, [stage, selectedIndex, generatedFile, fileName, onClose, interactionReady]);
 
     useEffect(() => {
         window.addEventListener('keydown', handleKeyDown);

@@ -86,7 +86,7 @@ function App() {
     useEffect(() => {
         const handleGlobalKeyDown = (e) => {
             if (e.key === 'Escape') {
-                if (['CONF', 'HELP', 'LIST', 'AUTH', 'PHILOSOPHY', 'JOKE', 'EXPORT'].includes(mode)) {
+                if (['CONF', 'HELP', 'LIST', 'AUTH', 'PHILOSOPHY', 'JOKE'].includes(mode)) {
                     setMode('ROOT');
                     setSearchTerm('');
                     setInputVal(''); // Clear input on escape
