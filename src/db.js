@@ -1,7 +1,7 @@
 import Dexie from 'dexie';
 
-export const db = new Dexie('VyliteCloneDB');
+export const db = new Dexie('VyliteCloneDB_v2');
 
-db.version(1).stores({
-    notes: '++id, title, content, createdAt, updatedAt', // Primary key and indexed props
+db.version(2).stores({
+    notes: 'id, title, syncStatus, lastModified, deleted, createdAt, updatedAt', // UUID primary key
 });

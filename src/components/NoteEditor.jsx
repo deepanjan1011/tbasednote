@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../db';
+import { v4 as uuidv4 } from 'uuid';
 
 const NoteEditor = ({ onExit, initialNoteId, settings }) => {
     const [content, setContent] = useState('');
@@ -23,13 +24,22 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
         };
 
         const createNew = async () => {
-            const id = await db.notes.add({
-                title: '',
-                content: '',
-                createdAt: new Date(),
-                updatedAt: new Date()
-            });
-            setNoteId(id);
+            try {
+                const id = uuidv4();
+                await db.notes.add({
+                    id,
+                    title: '',
+                    content: '',
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    syncStatus: 'pending',
+                    lastModified: new Date().toISOString(),
+                    deleted: false
+                });
+                setNoteId(id);
+            } catch (error) {
+                console.error("Failed to create new note:", error);
+            }
         };
 
         initNote();
@@ -45,7 +55,9 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
             await db.notes.update(noteId, {
                 content: val,
                 title: title,
-                updatedAt: new Date()
+                updatedAt: new Date(),
+                syncStatus: 'pending',
+                lastModified: new Date().toISOString()
             });
         }
     };
@@ -58,8 +70,13 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
         if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
             e.preventDefault();
             if (noteId) {
-                db.notes.delete(noteId);
-                onExit();
+                // Soft delete
+                db.notes.update(noteId, {
+                    deleted: true,
+                    syncStatus: 'pending',
+                    lastModified: new Date().toISOString()
+                }).then(() => onExit())
+                    .catch(e => console.error("Update failed:", e));
             }
         }
     };

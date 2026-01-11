@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { db } from './db';
+import { v4 as uuidv4 } from 'uuid';
 import { fetchJoke } from './lib/gemini';
 import CommandBar from './components/CommandBar';
 import NoteEditor from './components/NoteEditor';
 import NoteList from './components/NoteList';
 import AuthModal from './components/AuthModal';
 import SettingsView from './components/SettingsView';
+import ExportMenu from './components/ExportMenu';
 
 import { getInitialSettings } from './config/settings';
 
@@ -63,6 +65,9 @@ function App() {
         root.style.setProperty('--border-radius', formatValue(settings.border_radius, 'rem'));
         root.style.setProperty('--border-width', formatValue(settings.border_width, 'px'));
 
+        // Persist settings
+        localStorage.setItem('vylite_settings', JSON.stringify(settings));
+
     }, [settings]);
 
     const handleUpdateSettings = (key, value) => {
@@ -81,7 +86,7 @@ function App() {
     useEffect(() => {
         const handleGlobalKeyDown = (e) => {
             if (e.key === 'Escape') {
-                if (['CONF', 'HELP', 'LIST', 'AUTH', 'PHILOSOPHY', 'JOKE'].includes(mode)) {
+                if (['CONF', 'HELP', 'LIST', 'AUTH', 'PHILOSOPHY', 'JOKE', 'EXPORT'].includes(mode)) {
                     setMode('ROOT');
                     setSearchTerm('');
                     setInputVal(''); // Clear input on escape
@@ -105,11 +110,28 @@ function App() {
     const handleCommand = (cmd) => {
         if (cmd === '/c') {
             setStatusMsg('creating note...');
-            setTimeout(() => {
-                setActiveNoteId(null);
-                setMode('EDITOR');
-                setStatusMsg('');
-                setInputVal('');
+            setTimeout(async () => {
+                // Create note explicitly here to avoid double-creation in NoteEditor due to React StrictMode
+                try {
+                    const newId = uuidv4();
+                    await db.notes.add({
+                        id: newId,
+                        title: '',
+                        content: '',
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                        syncStatus: 'pending',
+                        lastModified: new Date().toISOString(),
+                        deleted: false
+                    });
+                    setActiveNoteId(newId);
+                    setMode('EDITOR');
+                    setStatusMsg('');
+                    setInputVal('');
+                } catch (e) {
+                    console.error("Failed to create note:", e);
+                    setStatusMsg('error creating note');
+                }
             }, 800);
         } else if (cmd === '/a') {
             setMode('LIST');
@@ -120,18 +142,8 @@ function App() {
         } else if (cmd === '/conf') {
             setMode('CONF');
         } else if (cmd === '/export') {
-            setStatusMsg('exporting...');
-            db.notes.toArray().then(notes => {
-                const blob = new Blob([JSON.stringify(notes, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `vylite-notes-${new Date().toISOString().slice(0, 10)}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-                setStatusMsg('exported!');
-                setTimeout(() => setStatusMsg(''), 2000);
-            });
+            setMode('EXPORT');
+            // Old direct download logic removed in favor of UI menu
         } else if (cmd === '/vylite') {
             setMode('PHILOSOPHY');
         } else if (cmd === '/joke') {
@@ -214,6 +226,10 @@ function App() {
                                 >/conf</span>
                             </div>
                             <div className="text-right text-xs mt-1" style={{ color: 'var(--muted-color)' }}>esc or backspace to exit</div>
+                        </div>
+                    ) : mode === 'EXPORT' ? (
+                        <div className="w-full mb-8">
+                            <ExportMenu onClose={() => setMode('ROOT')} />
                         </div>
                     ) : (
                         <div
@@ -308,65 +324,67 @@ function App() {
                         <SettingsView settings={settings} onUpdateSettings={handleUpdateSettings} />
                     )}
 
+
+
                     {mode === 'HELP' && (
-                        <div className="mt-8 w-full text-sm text-white/60 animate-in fade-in slide-in-from-bottom-4 space-y-6 pb-20">
+                        <div className="mt-8 w-full text-sm animate-in fade-in slide-in-from-bottom-4 space-y-6 pb-20" style={{ color: 'var(--muted-color)' }}>
                             <div>
-                                <h3 className="mb-2 text-xs text-white/30 tracking-wider">CORE</h3>
+                                <h3 className="mb-2 text-xs tracking-wider opacity-60">CORE</h3>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="flex items-center gap-3">
-                                        <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/c</span>
+                                        <span className="px-2 py-1 rounded font-medium text-xs" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>/c</span>
                                         <span>create new note</span>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/a</span>
+                                        <span className="px-2 py-1 rounded font-medium text-xs" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>/a</span>
                                         <span>view all notes</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div>
-                                <h3 className="mb-2 text-xs text-white/30 tracking-wider">SETTINGS</h3>
+                                <h3 className="mb-2 text-xs tracking-wider opacity-60">SETTINGS</h3>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="flex items-center gap-3">
-                                        <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/acc</span>
+                                        <span className="px-2 py-1 rounded font-medium text-xs" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>/acc</span>
                                         <span>account details</span>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/conf</span>
+                                        <span className="px-2 py-1 rounded font-medium text-xs" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>/conf</span>
                                         <span>edit configuration</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div>
-                                <h3 className="mb-2 text-xs text-white/30 tracking-wider">TOOLS</h3>
+                                <h3 className="mb-2 text-xs tracking-wider opacity-60">TOOLS</h3>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="flex items-center gap-3">
-                                        <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/export</span>
+                                        <span className="px-2 py-1 rounded font-medium text-xs" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>/export</span>
                                         <span>export notes</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div>
-                                <h3 className="mb-2 text-xs text-white/30 tracking-wider">META</h3>
+                                <h3 className="mb-2 text-xs tracking-wider opacity-60">META</h3>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="flex items-center gap-3">
-                                        <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/h</span>
+                                        <span className="px-2 py-1 rounded font-medium text-xs" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>/h</span>
                                         <span>hide commands</span>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/vylite</span>
+                                        <span className="px-2 py-1 rounded font-medium text-xs" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>/vylite</span>
                                         <span>vylite&apos;s philosophy</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div>
-                                <h3 className="mb-2 text-xs text-white/30 tracking-wider">OTHERS</h3>
+                                <h3 className="mb-2 text-xs tracking-wider opacity-60">OTHERS</h3>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="flex items-center gap-3">
-                                        <span className="bg-white/10 px-2 py-1 rounded text-white font-medium text-xs">/joke</span>
+                                        <span className="px-2 py-1 rounded font-medium text-xs" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>/joke</span>
                                         <span>get a random joke</span>
                                     </div>
                                 </div>

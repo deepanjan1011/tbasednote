@@ -6,7 +6,8 @@ const NoteList = ({ searchTerm, onSelectNote, settings, limit }) => {
     const notes = useLiveQuery(
         async () => {
             let collection = db.notes.orderBy('updatedAt').reverse();
-            const all = await collection.toArray();
+            const allRaw = await collection.toArray();
+            const all = allRaw.filter(n => !n.deleted);
 
             if (searchTerm) {
                 const lowerTerm = searchTerm.toLowerCase();
