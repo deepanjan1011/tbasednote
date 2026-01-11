@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { db } from './db';
+import { supabase } from './lib/supabase'; // Import supabase here
 import { v4 as uuidv4 } from 'uuid';
 import { fetchJoke } from './lib/gemini';
+import { syncNotes } from './lib/sync';
 import CommandBar from './components/CommandBar';
 import NoteEditor from './components/NoteEditor';
 import NoteList from './components/NoteList';
@@ -21,6 +23,93 @@ function App() {
 
     // Settings State
     const [settings, setSettings] = useState(getInitialSettings());
+
+    // Start Sync Loop
+    useEffect(() => {
+        // Initial sync
+        syncNotes();
+
+        // Sync every 30 seconds
+        const intervalId = setInterval(() => {
+            syncNotes();
+        }, 30000);
+
+        // Sync when coming back online
+        const handleOnline = () => {
+            console.log('Online detected, syncing...');
+            syncNotes();
+        };
+
+        // Sync when tab becomes visible (user returns)
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                console.log('Tab visible, syncing...');
+                syncNotes();
+            }
+        };
+
+        window.addEventListener('online', handleOnline);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            clearInterval(intervalId);
+            window.removeEventListener('online', handleOnline);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
+
+    // Auth & Data Merge Logic
+    useEffect(() => {
+        if (!supabase) return;
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_IN' && session?.user) {
+                // User logged in!
+                setMode('ROOT'); // Close auth modal if open
+                setStatusMsg(`> welcome ${session.user.email?.split('@')[0]}... syncing...`);
+                setTimeout(() => setStatusMsg(''), 3000); // Clear welcome message after 3s
+
+                // Merge Data Strategy:
+                // Find all local notes that do NOT have a userId yet.
+                // Assign them to this user.
+                try {
+                    // For simple Dexie queries, we filter in JS or use where().
+                    // Dexie doesn't query 'null' easily in all adapters, so we filter.
+                    const orphans = await db.notes.filter(n => !n.userId).toArray();
+
+                    if (orphans.length > 0) {
+                        console.log(`Merging ${orphans.length} orphaned notes to user ${session.user.id}`);
+                        await db.transaction('rw', db.notes, async () => {
+                            for (const note of orphans) {
+                                await db.notes.update(note.id, {
+                                    userId: session.user.id,
+                                    syncStatus: 'pending',
+                                    lastModified: new Date().toISOString()
+                                });
+                            }
+                        });
+                        // Trigger immediate sync to push these changes
+                        syncNotes();
+                    } else {
+                        // Even if no orphans, trigger sync to pull remote notes
+                        syncNotes();
+                    }
+                } catch (e) {
+                    console.error("Data merge failed:", e);
+                }
+            } else if (event === 'SIGNED_OUT') {
+                setStatusMsg('> signing out...');
+                setTimeout(() => setStatusMsg(''), 2000);
+                setMode('ROOT');
+                // Optional: Clear local data?
+                // For Vylite "Local First", we might keep them, but it's risky for shared public computers.
+                // Let's keep them for now as per "Speed" requirement, or clear them if strictly "Auth" focused.
+                // Given the instructions, we'll keep the session-based approach simple.
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
 
     // Apply Settings (Themes & Layout)
     useEffect(() => {
@@ -86,7 +175,7 @@ function App() {
     useEffect(() => {
         const handleGlobalKeyDown = (e) => {
             if (e.key === 'Escape') {
-                if (['CONF', 'HELP', 'LIST', 'AUTH', 'PHILOSOPHY', 'JOKE'].includes(mode)) {
+                if (['CONF', 'HELP', 'LIST', 'PHILOSOPHY', 'JOKE'].includes(mode)) {
                     setMode('ROOT');
                     setSearchTerm('');
                     setInputVal(''); // Clear input on escape
@@ -128,6 +217,8 @@ function App() {
                     setMode('EDITOR');
                     setStatusMsg('');
                     setInputVal('');
+                    // Trigger background sync
+                    syncNotes();
                 } catch (e) {
                     console.error("Failed to create note:", e);
                     setStatusMsg('error creating note');
@@ -194,6 +285,8 @@ function App() {
                     onExit={() => {
                         setMode('ROOT');
                         setActiveNoteId(null);
+                        // Trigger sync when closing editor
+                        syncNotes();
                     }}
                     settings={settings}
                 />

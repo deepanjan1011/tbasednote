@@ -21,6 +21,9 @@ A minimalist, keyboard-centric note-taking application inspired by the Vylite ae
     npm run dev
     ```
 
+3.  **Setup Backend (Optional)**:
+    -   To enable Cloud Sync and Authentication, follow the [Supabase Setup Guide](./SETUP_SUPABASE.md).
+
 ## Commands
 
 - `/c` - Create a new note
