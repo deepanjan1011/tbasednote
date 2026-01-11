@@ -46,13 +46,23 @@ export const SECTIONS = [
 ];
 
 export const getInitialSettings = () => {
-    const initial = {};
+    const defaults = {};
     SECTIONS.forEach(section => {
         section.items.forEach(item => {
             if (item.value !== undefined) {
-                initial[item.key] = item.value;
+                defaults[item.key] = item.value;
             }
         });
     });
-    return initial;
+
+    try {
+        const saved = localStorage.getItem('vylite_settings');
+        if (saved) {
+            return { ...defaults, ...JSON.parse(saved) };
+        }
+    } catch (e) {
+        console.error("Failed to load settings:", e);
+    }
+
+    return defaults;
 };
