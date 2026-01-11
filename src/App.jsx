@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { db } from './db';
 import { supabase } from './lib/supabase'; // Import supabase here
 import { v4 as uuidv4 } from 'uuid';
-import { fetchJoke } from './lib/gemini';
+import { fetchJoke } from './lib/joke';
 import { syncNotes } from './lib/sync';
 import CommandBar from './components/CommandBar';
 import NoteEditor from './components/NoteEditor';
