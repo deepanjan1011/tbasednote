@@ -66,8 +66,13 @@ function App() {
             if (event === 'SIGNED_IN' && session?.user) {
                 // User logged in!
                 setMode('ROOT'); // Close auth modal if open
-                setStatusMsg(`> welcome ${session.user.email?.split('@')[0]}... syncing...`);
-                setTimeout(() => setStatusMsg(''), 3000); // Clear welcome message after 3s
+
+                // Only show welcome message if this is a fresh login action
+                if (sessionStorage.getItem('vylite_logging_in')) {
+                    setStatusMsg(`> welcome ${session.user.email?.split('@')[0]}... syncing...`);
+                    setTimeout(() => setStatusMsg(''), 3000); // Clear welcome message after 3s
+                    sessionStorage.removeItem('vylite_logging_in');
+                }
 
                 // Merge Data Strategy:
                 // Find all local notes that do NOT have a userId yet.

@@ -70,6 +70,7 @@ const AuthModal = ({ onClose }) => {
             return;
         }
         setLoading(true);
+        sessionStorage.setItem('vylite_logging_in', 'true'); // Flag for welcome msg
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
         });
@@ -98,6 +99,7 @@ const AuthModal = ({ onClose }) => {
 
         setLoading(true);
         setError('');
+        sessionStorage.setItem('vylite_logging_in', 'true'); // Flag for welcome msg
 
         try {
             if (mode === 'SIGN_IN') {
