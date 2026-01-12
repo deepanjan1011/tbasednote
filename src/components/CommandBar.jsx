@@ -7,7 +7,11 @@ const CommandBar = ({ onCommand, onSearch, value, onChange, placeholder }) => {
     const inputRef = useRef(null);
 
     useEffect(() => {
-        inputRef.current?.focus();
+        // slight delay to ensure render completion
+        const timer = setTimeout(() => {
+            inputRef.current?.focus();
+        }, 10);
+        return () => clearTimeout(timer);
     }, []);
 
     const handleChange = (e) => {
@@ -39,6 +43,7 @@ const CommandBar = ({ onCommand, onSearch, value, onChange, placeholder }) => {
         <div className="w-full relative group">
             <input
                 ref={inputRef}
+                autoFocus
                 type="text"
                 value={value}
                 onChange={handleChange}

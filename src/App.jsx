@@ -8,6 +8,7 @@ import CommandBar from './components/CommandBar';
 import NoteEditor from './components/NoteEditor';
 import NoteList from './components/NoteList';
 import AuthModal from './components/AuthModal';
+import MergeModal from './components/MergeModal';
 import SettingsView from './components/SettingsView';
 import ExportMenu from './components/ExportMenu';
 
@@ -22,7 +23,13 @@ function App() {
     const [jokeText, setJokeText] = useState('');
 
     // Settings State
+    // Settings State
     const [settings, setSettings] = useState(getInitialSettings());
+
+    // Merge State
+    const [showMergeModal, setShowMergeModal] = useState(false);
+    const [mergeCandidates, setMergeCandidates] = useState([]);
+    const [currentUserEmail, setCurrentUserEmail] = useState('');
 
     // Start Sync Loop
     useEffect(() => {
@@ -74,34 +81,22 @@ function App() {
                     sessionStorage.removeItem('vylite_logging_in');
                 }
 
-                // Merge Data Strategy:
-                // Find all local notes that do NOT have a userId yet.
-                // Assign them to this user.
-                try {
-                    // For simple Dexie queries, we filter in JS or use where().
-                    // Dexie doesn't query 'null' easily in all adapters, so we filter.
-                    const orphans = await db.notes.filter(n => !n.userId).toArray();
-
-                    if (orphans.length > 0) {
-                        console.log(`Merging ${orphans.length} orphaned notes to user ${session.user.id}`);
-                        await db.transaction('rw', db.notes, async () => {
-                            for (const note of orphans) {
-                                await db.notes.update(note.id, {
-                                    userId: session.user.id,
-                                    syncStatus: 'pending',
-                                    lastModified: new Date().toISOString()
-                                });
-                            }
-                        });
-                        // Trigger immediate sync to push these changes
-                        syncNotes();
-                    } else {
-                        // Even if no orphans, trigger sync to pull remote notes
-                        syncNotes();
+                // Check for orphaned local notes with a slight delay
+                // preventing the modal from jarringly popping up before the "welcome" message is registered
+                setTimeout(async () => {
+                    try {
+                        const orphans = await db.notes.filter(n => !n.userId).toArray();
+                        if (orphans.length > 0) {
+                            setMergeCandidates(orphans);
+                            setShowMergeModal(true);
+                        } else {
+                            // Even if no orphans, trigger sync to pull remote notes
+                            syncNotes();
+                        }
+                    } catch (e) {
+                        console.error("Data check failed:", e);
                     }
-                } catch (e) {
-                    console.error("Data merge failed:", e);
-                }
+                }, 1200);
             } else if (event === 'SIGNED_OUT') {
                 setStatusMsg('> signing out...');
                 setTimeout(() => setStatusMsg(''), 2000);
@@ -173,6 +168,33 @@ function App() {
             ...prev,
             [key]: value
         }));
+    };
+
+    const handleMerge = async () => {
+        if (!supabase) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        console.log(`Merging ${mergeCandidates.length} orphaned notes to user ${user.id}`);
+        await db.transaction('rw', db.notes, async () => {
+            for (const note of mergeCandidates) {
+                await db.notes.update(note.id, {
+                    userId: user.id,
+                    syncStatus: 'pending',
+                    lastModified: new Date().toISOString()
+                });
+            }
+        });
+
+        setShowMergeModal(false);
+        setMergeCandidates([]);
+        syncNotes(); // Push changes
+    };
+
+    const handleSkipMerge = () => {
+        setShowMergeModal(false);
+        setMergeCandidates([]);
+        syncNotes(); // Just pull remote notes
     };
 
 
@@ -274,6 +296,15 @@ function App() {
         setInputVal(''); // Optional: clear search when opening note
     };
 
+    const handleRequestMerge = async () => {
+        const orphans = await db.notes.filter(n => !n.userId).toArray();
+        if (orphans.length > 0) {
+            setMergeCandidates(orphans);
+            setShowMergeModal(true);
+            setMode('ROOT');
+        }
+    };
+
     return (
         <div
             className="min-h-screen font-mono flex items-center justify-center overflow-hidden transition-colors duration-300"
@@ -282,7 +313,16 @@ function App() {
                 color: 'var(--text-color)'
             }}
         >
-            {mode === 'AUTH' && <AuthModal onClose={() => setMode('ROOT')} />}
+            {mode === 'AUTH' && <AuthModal onClose={() => setMode('ROOT')} onRequestMerge={handleRequestMerge} />}
+
+            {showMergeModal && (
+                <MergeModal
+                    count={mergeCandidates.length}
+                    userEmail={currentUserEmail}
+                    onMerge={handleMerge}
+                    onSkip={handleSkipMerge}
+                />
+            )}
 
             {mode === 'EDITOR' ? (
                 <NoteEditor

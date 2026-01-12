@@ -22,35 +22,40 @@ export async function syncNotes() {
             console.log(`Syncing ${pendingNotes.length} notes to cloud...`);
 
             // Transform for Supabase (Snake Case)
-            const upsertData = pendingNotes.map(n => ({
-                id: n.id,
-                title: n.title,
-                content: n.content,
-                updated_at: n.updatedAt,
-                // created_at is usually managed by default, but we can pass it if we want to preserve local creation time
-                created_at: n.createdAt,
-                user_id: n.userId || user.id, // Use note's assigned ID or current session ID
-                deleted: n.deleted || false
-            }));
+            // CRITICAL: Only sync notes that explicitly belong to this user. 
+            // Do NOT auto-assign 'user.id' to orphans here.
+            const upsertData = pendingNotes
+                .filter(n => n.userId === user.id) // Only push notes claimed by this user
+                .map(n => ({
+                    id: n.id,
+                    title: n.title,
+                    content: n.content,
+                    updated_at: n.updatedAt,
+                    // created_at is usually managed by default, but we can pass it if we want to preserve local creation time
+                    created_at: n.createdAt,
+                    user_id: n.userId, // Must be present
+                    deleted: n.deleted || false
+                }));
 
-            const { error: pushError } = await supabase
-                .from('notes')
-                .upsert(upsertData);
-
-            if (pushError) {
-                console.error('Push failed:', pushError);
-                // Don't update syncStatus if failed, so we retry next time
+            if (upsertData.length === 0) {
+                // No notes to push for this user
             } else {
-                // On success, mark these IDs as synced locally
-                // We do this individually or bulk. Bulk is better.
-                // However, Dexie's bulkUpdate isn't straightforward for this specific conditional, 
-                // so we loop. For small batches, this is fine.
-                await db.transaction('rw', db.notes, async () => {
-                    for (const note of pendingNotes) {
-                        await db.notes.update(note.id, { syncStatus: 'synced' });
-                    }
-                });
-                console.log('Push complete.');
+                const { error: pushError } = await supabase
+                    .from('notes')
+                    .upsert(upsertData);
+
+                if (pushError) {
+                    console.error('Push failed:', pushError);
+                    // Don't update syncStatus if failed, so we retry next time
+                } else {
+                    // On success, mark these IDs as synced locally
+                    await db.transaction('rw', db.notes, async () => {
+                        for (const note of upsertData) {
+                            await db.notes.update(note.id, { syncStatus: 'synced' });
+                        }
+                    });
+                    console.log(`Pushed ${upsertData.length} notes.`);
+                }
             }
         }
 

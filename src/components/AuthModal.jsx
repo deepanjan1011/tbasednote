@@ -2,13 +2,13 @@ import { useState, useRef, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { db } from '../db';
 
-const AuthModal = ({ onClose }) => {
+const AuthModal = ({ onClose, onRequestMerge }) => {
     // view: 'MENU', 'EMAIL', 'PROFILE'
     const [view, setView] = useState('MENU');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [user, setUser] = useState(null);
-    const [stats, setStats] = useState({ total: 0, synced: 0, pending: 0 });
+    const [stats, setStats] = useState({ total: 0, synced: 0, pending: 0, localOnly: 0 });
 
     // Menu Navigation State
     const [menuIndex, setMenuIndex] = useState(0); // 0: Google, 1: Email
@@ -51,7 +51,8 @@ const AuthModal = ({ onClose }) => {
                 const total = allNotes.filter(n => !n.deleted).length;
                 const synced = allNotes.filter(n => !n.deleted && n.syncStatus === 'synced').length;
                 const pending = allNotes.filter(n => !n.deleted && n.syncStatus === 'pending').length;
-                setStats({ total, synced, pending });
+                const localOnly = allNotes.filter(n => !n.userId).length;
+                setStats({ total, synced, pending, localOnly });
             }
         });
 
@@ -142,16 +143,19 @@ const AuthModal = ({ onClose }) => {
             }
 
             if (view === 'PROFILE') {
+                const maxIndex = stats.localOnly > 0 ? 4 : 3;
                 if (e.key === 'ArrowDown') {
                     e.preventDefault();
-                    setProfileIndex(prev => Math.min(prev + 1, 3));
+                    setProfileIndex(prev => Math.min(prev + 1, maxIndex));
                 }
                 if (e.key === 'ArrowUp') {
                     e.preventDefault();
                     setProfileIndex(prev => Math.max(prev - 1, 0));
                 }
                 if (e.key === 'Enter') {
-                    if (profileIndex === 3) {
+                    if (profileIndex === 3 && stats.localOnly > 0) {
+                        onRequestMerge?.();
+                    } else if (profileIndex === maxIndex) {
                         handleLogout();
                     }
                 }
@@ -288,15 +292,29 @@ const AuthModal = ({ onClose }) => {
                                 {stats.pending > 0 && <span className="text-yellow-400 text-xs">({stats.pending} pending)</span>}
                             </div>
 
+                            {/* Local Orphans (Merge Option) */}
+                            {stats.localOnly > 0 && (
+                                <div
+                                    onClick={() => { setProfileIndex(3); onRequestMerge?.(); }}
+                                    className={`p-6 font-mono text-sm flex items-center gap-4 border-b transition-colors cursor-pointer ${profileIndex === 3 ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                                    style={{ borderColor: 'var(--border-color)' }}
+                                >
+                                    <span className="opacity-50 w-24">local:</span>
+                                    <span className="text-yellow-400 font-bold">{stats.localOnly} notes</span>
+                                    <span className="text-xs opacity-50 ml-auto flex items-center gap-1 group">
+                                        [merge] {profileIndex === 3 && <span>↵</span>}
+                                    </span>
+                                </div>
+                            )}
 
                             {/* Logout */}
                             <div
                                 ref={logoutRef}
-                                onClick={() => { setProfileIndex(3); handleLogout(); }}
-                                className={`p-6 font-mono text-sm cursor-pointer transition-colors text-red-400 outline-none font-bold ${profileIndex === 3 ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                                onClick={() => { setProfileIndex(stats.localOnly > 0 ? 4 : 3); handleLogout(); }}
+                                className={`p-6 font-mono text-sm cursor-pointer transition-colors text-red-400 outline-none font-bold ${profileIndex === (stats.localOnly > 0 ? 4 : 3) ? 'bg-white/10' : 'hover:bg-white/5'}`}
                             >
                                 logout
-                                {profileIndex === 3 && <span className="ml-auto float-right opacity-50 text-xs">↵</span>}
+                                {profileIndex === (stats.localOnly > 0 ? 4 : 3) && <span className="ml-auto float-right opacity-50 text-xs">↵</span>}
                             </div>
                         </div>
                     )}
