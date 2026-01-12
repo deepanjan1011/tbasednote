@@ -77,12 +77,13 @@ function App() {
                 // Only show welcome message if this is a fresh login action
                 if (sessionStorage.getItem('vylite_logging_in')) {
                     setStatusMsg(`> welcome ${session.user.email?.split('@')[0]}... syncing...`);
-                    setTimeout(() => setStatusMsg(''), 3000); // Clear welcome message after 3s
+                    setTimeout(() => setStatusMsg(''), 1500); // Clear welcome message quickly so user sees home screen
                     sessionStorage.removeItem('vylite_logging_in');
                 }
 
-                // Check for orphaned local notes with a slight delay
+                // Check for orphaned local notes with a delay
                 // preventing the modal from jarringly popping up before the "welcome" message is registered
+                // Waiting 2s allows the user to land on the home screen first
                 setTimeout(async () => {
                     try {
                         const orphans = await db.notes.filter(n => !n.userId).toArray();
@@ -96,7 +97,7 @@ function App() {
                     } catch (e) {
                         console.error("Data check failed:", e);
                     }
-                }, 1200);
+                }, 2200);
             } else if (event === 'SIGNED_OUT') {
                 setStatusMsg('> signing out...');
                 setTimeout(() => setStatusMsg(''), 2000);
