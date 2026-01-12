@@ -11,6 +11,7 @@ import AuthModal from './components/AuthModal';
 import MergeModal from './components/MergeModal';
 import SettingsView from './components/SettingsView';
 import ExportMenu from './components/ExportMenu';
+import HelpMenu from './components/HelpMenu';
 
 import { getInitialSettings } from './config/settings';
 
@@ -262,7 +263,12 @@ function App() {
         } else if (cmd === '/a') {
             setMode('LIST');
         } else if (cmd === '/h') {
-            setMode('HELP');
+            if (mode === 'HELP') {
+                setMode('ROOT');
+                setInputVal('');
+            } else {
+                setMode('HELP');
+            }
         } else if (cmd === '/acc') {
             setMode('AUTH');
         } else if (cmd === '/conf') {
@@ -270,8 +276,6 @@ function App() {
         } else if (cmd === '/export') {
             setMode('EXPORT');
             // Old direct download logic removed in favor of UI menu
-        } else if (cmd === '/vylite') {
-            setMode('PHILOSOPHY');
         } else if (cmd === '/joke') {
             setMode('JOKE');
             setJokeText('thinking...');
@@ -475,87 +479,7 @@ function App() {
 
 
 
-                    {mode === 'HELP' && (
-                        <div className="mt-8 w-full text-sm animate-in fade-in slide-in-from-bottom-4 space-y-6 pb-20" style={{ color: 'var(--muted-color)' }}>
-                            <div>
-                                <h3 className="mb-2 text-xs tracking-wider opacity-60">CORE</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="flex items-center gap-3">
-                                        <span className="px-2 py-1 rounded font-medium text-xs" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>/c</span>
-                                        <span>create new note</span>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="px-2 py-1 rounded font-medium text-xs" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>/a</span>
-                                        <span>view all notes</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <h3 className="mb-2 text-xs tracking-wider opacity-60">SETTINGS</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="flex items-center gap-3">
-                                        <span className="px-2 py-1 rounded font-medium text-xs" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>/acc</span>
-                                        <span>account details</span>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="px-2 py-1 rounded font-medium text-xs" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>/conf</span>
-                                        <span>edit configuration</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <h3 className="mb-2 text-xs tracking-wider opacity-60">TOOLS</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="flex items-center gap-3">
-                                        <span className="px-2 py-1 rounded font-medium text-xs" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>/export</span>
-                                        <span>export notes</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <h3 className="mb-2 text-xs tracking-wider opacity-60">META</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="flex items-center gap-3">
-                                        <span className="px-2 py-1 rounded font-medium text-xs" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>/h</span>
-                                        <span>hide commands</span>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="px-2 py-1 rounded font-medium text-xs" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>/vylite</span>
-                                        <span>vylite&apos;s philosophy</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <h3 className="mb-2 text-xs tracking-wider opacity-60">OTHERS</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="flex items-center gap-3">
-                                        <span className="px-2 py-1 rounded font-medium text-xs" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>/joke</span>
-                                        <span>get a random joke</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {mode === 'PHILOSOPHY' && (
-                        <div className="mt-12 max-w-md text-center animate-in fade-in zoom-in-95 leading-relaxed space-y-6">
-                            <h2 className="text-xl font-bold tracking-tight">The Vylite Philosophy</h2>
-                            <p className="text-sm opacity-80">
-                                Simplicity is the ultimate sophistication.
-                            </p>
-                            <p className="text-sm opacity-80">
-                                We believe in tools that disappear, leaving only you and your thoughts.
-                                No distractions, no clutter, just the void and your creativity.
-                            </p>
-                            <div className="pt-8 text-xs opacity-50 font-mono">
-                                press esc to return
-                            </div>
-                        </div>
-                    )}
+                    {mode === 'HELP' && <HelpMenu />}
 
                     {mode === 'JOKE' && (
                         <div className="mt-20 max-w-md text-center animate-in fade-in zoom-in-95">
