@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { db } from '../db';
 
@@ -46,13 +47,9 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
                 setView('PROFILE');
                 setProfileIndex(0); // Reset to top
 
-                // Fetch Stats
-                const allNotes = await db.notes.toArray();
-                const total = allNotes.filter(n => !n.deleted).length;
-                const synced = allNotes.filter(n => !n.deleted && n.syncStatus === 'synced').length;
-                const pending = allNotes.filter(n => !n.deleted && n.syncStatus === 'pending').length;
-                const localOnly = allNotes.filter(n => !n.userId).length;
-                setStats({ total, synced, pending, localOnly });
+                setUser(session.user);
+                setView('PROFILE');
+                setProfileIndex(0); // Reset to top
             }
         });
 
@@ -63,6 +60,22 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
 
         return () => clearTimeout(timer);
     }, [view]);
+
+    const liveStats = useLiveQuery(async () => {
+        if (!user) return { total: 0, synced: 0, pending: 0, localOnly: 0 };
+        const allNotes = await db.notes.toArray();
+        const total = allNotes.filter(n => !n.deleted).length;
+        const synced = allNotes.filter(n => !n.deleted && n.syncStatus === 'synced' && n.userId === user.id).length;
+        const pending = allNotes.filter(n => !n.deleted && n.syncStatus === 'pending' && n.userId === user.id).length;
+        // Local only = Orphaned OR Belonging to another user (potential to merge)
+        const localOnly = allNotes.filter(n => !n.deleted && (!n.userId || n.userId !== user.id)).length;
+        return { total, synced, pending, localOnly };
+    }, [user]) || { total: 0, synced: 0, pending: 0, localOnly: 0 };
+
+    // Use live stats instead of state
+    useEffect(() => {
+        setStats(liveStats);
+    }, [liveStats]);
 
     // Handle Google Login
     const handleOAuth = async () => {

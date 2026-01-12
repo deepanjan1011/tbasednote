@@ -86,9 +86,10 @@ function App() {
                     // Delayed check for fresh logins
                     setTimeout(async () => {
                         try {
-                            const orphans = await db.notes.filter(n => !n.userId).toArray();
-                            if (orphans.length > 0) {
-                                setMergeCandidates(orphans);
+                            // Check for Orphans AND Foreign notes
+                            const candidates = await db.notes.filter(n => !n.userId || n.userId !== session.user.id).toArray();
+                            if (candidates.length > 0) {
+                                setMergeCandidates(candidates);
                                 setShowMergeModal(true);
                             } else {
                                 syncNotes();
@@ -304,9 +305,11 @@ function App() {
     };
 
     const handleRequestMerge = async () => {
-        const orphans = await db.notes.filter(n => !n.userId).toArray();
-        if (orphans.length > 0) {
-            setMergeCandidates(orphans);
+        if (!currentUserId) return;
+        // Collect Orphans AND Foreign notes
+        const candidates = await db.notes.filter(n => !n.userId || n.userId !== currentUserId).toArray();
+        if (candidates.length > 0) {
+            setMergeCandidates(candidates);
             setShowMergeModal(true);
             setMode('ROOT');
         }
