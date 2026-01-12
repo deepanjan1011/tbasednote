@@ -30,6 +30,7 @@ function App() {
     const [showMergeModal, setShowMergeModal] = useState(false);
     const [mergeCandidates, setMergeCandidates] = useState([]);
     const [currentUserEmail, setCurrentUserEmail] = useState('');
+    const [currentUserId, setCurrentUserId] = useState(null);
 
     // Start Sync Loop
     useEffect(() => {
@@ -102,6 +103,7 @@ function App() {
                 }
 
                 setCurrentUserEmail(session.user.email);
+                setCurrentUserId(session.user.id);
             } else if (event === 'SIGNED_OUT') {
                 setStatusMsg('> signing out...');
                 setTimeout(() => setStatusMsg(''), 2000);
@@ -455,12 +457,13 @@ function App() {
                                 onSelectNote={handleSelectNote}
                                 settings={settings}
                                 limit={3}
+                                currentUserId={currentUserId}
                             />
                         </div>
                     )}
 
                     {mode === 'LIST' && (
-                        <NoteList searchTerm={searchTerm} onSelectNote={handleSelectNote} settings={settings} />
+                        <NoteList searchTerm={searchTerm} onSelectNote={handleSelectNote} settings={settings} currentUserId={currentUserId} />
                     )}
 
                     {mode === 'CONF' && (

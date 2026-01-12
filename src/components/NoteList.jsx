@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { format, isToday, isYesterday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
 
-const NoteList = ({ searchTerm, onSelectNote, settings, limit }) => {
+const NoteList = ({ searchTerm, onSelectNote, settings, limit, currentUserId }) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
 
     const notes = useLiveQuery(
@@ -129,6 +129,7 @@ const NoteList = ({ searchTerm, onSelectNote, settings, limit }) => {
                                 <span
                                     className="text-xs font-mono opacity-40"
                                 >
+                                    {(!note.userId || (currentUserId && note.userId !== currentUserId)) && <span className="text-[10px] text-yellow-600 mr-2 opacity-80 font-bold">[local]</span>}
                                     {format(new Date(note.updatedAt), 'MMM do')}
                                 </span>
                             </div>
