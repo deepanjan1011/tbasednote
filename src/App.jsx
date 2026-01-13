@@ -13,6 +13,9 @@ import SettingsView from './components/SettingsView';
 import ExportMenu from './components/ExportMenu';
 import HelpMenu from './components/HelpMenu';
 
+
+import CryptoJS from 'crypto-js';
+
 import { getInitialSettings } from './config/settings';
 
 function App() {
@@ -87,8 +90,8 @@ function App() {
                     // Delayed check for fresh logins
                     setTimeout(async () => {
                         try {
-                            // Check for Orphans AND Foreign notes
-                            const candidates = await db.notes.filter(n => !n.userId || n.userId !== session.user.id).toArray();
+                            // Check for Orphans ONLY (notes with no userId)
+                            const candidates = await db.notes.filter(n => !n.userId && !n.deleted).toArray();
                             if (candidates.length > 0) {
                                 setMergeCandidates(candidates);
                                 setShowMergeModal(true);
@@ -168,9 +171,17 @@ function App() {
 
     }, [settings]);
 
-    const handleUpdateSettings = (key, value) => {
+    const handleUpdateSettings = async (key, value) => {
         if (key === 'reset_defaults') {
             setSettings(getInitialSettings());
+            return;
+        }
+        if (key === 'disable_encryption') {
+            await handleDisableEncryption();
+            return;
+        }
+        if (key === 'encrypt_all') {
+            await handleEncryptAll();
             return;
         }
         setSettings(prev => ({
@@ -187,23 +198,154 @@ function App() {
         console.log(`Merging ${mergeCandidates.length} orphaned notes to user ${user.id}`);
         await db.transaction('rw', db.notes, async () => {
             for (const note of mergeCandidates) {
-                await db.notes.update(note.id, {
+                // Regenerate ID to treat as NEW note and avoid Server RLS conflicts (ownership mismatch)
+                const newId = uuidv4();
+
+                // Add copy with new ID
+                await db.notes.add({
+                    ...note,
+                    id: newId,
                     userId: user.id,
                     syncStatus: 'pending',
                     lastModified: new Date().toISOString()
                 });
+
+                // Delete old orphaned note
+                await db.notes.delete(note.id);
             }
         });
 
         setShowMergeModal(false);
         setMergeCandidates([]);
-        syncNotes(); // Push changes
+        setStatusMsg('syncing to cloud...');
+
+        const result = await syncNotes(); // Push changes and wait for result
+
+        if (result.error) {
+            setStatusMsg(`sync failed: ${result.error}`);
+        } else {
+            if (result.pushed === 0 && result.pendingFound > 0) {
+                setStatusMsg(`sync warn: found ${result.pendingFound}, pushed 0 (mismatch: ${result.userMismatch})`);
+            } else {
+                setStatusMsg(`synced: pushed ${result.pushed}, pulled ${result.pulled}`);
+            }
+        }
+        setTimeout(() => setStatusMsg(''), 4000);
     };
 
     const handleSkipMerge = () => {
         setShowMergeModal(false);
         setMergeCandidates([]);
         syncNotes(); // Just pull remote notes
+    };
+
+    const handleDisableEncryption = async () => {
+        const key = settings.encryption_key;
+        if (!key) {
+            setStatusMsg('Enter key above first!');
+            setTimeout(() => setStatusMsg(''), 2000);
+            return;
+        }
+
+        setStatusMsg('decrypting all notes...');
+        try {
+            await db.transaction('rw', db.notes, async () => {
+                const allNotes = await db.notes.toArray();
+                let successCount = 0;
+                let failCount = 0;
+
+                for (const note of allNotes) {
+                    if (note.content) {
+                        // Check if it LOOKS encrypted (starts with U2F - standard openssl/cryptojs prefix base64)
+                        if (!note.content.startsWith('U2F')) {
+                            // Assume plaintext or different format, skip to avoid double decrypting garbage
+                            console.log(`Skipping potential plaintext note: ${note.id}`);
+                            continue;
+                        }
+
+                        try {
+                            const bytes = CryptoJS.AES.decrypt(note.content, key);
+                            const originalText = bytes.toString(CryptoJS.enc.Utf8);
+
+                            // Critical Check: If empty string, decryption likely failed (wrong key)
+                            if (originalText.length > 0) {
+                                await db.notes.update(note.id, {
+                                    content: originalText,
+                                    lastModified: new Date().toISOString(),
+                                    syncStatus: 'pending'
+                                });
+                                successCount++;
+                            } else {
+                                // Empty result from decrypt usually means wrong key or empty content
+                                if (note.content.length > 0) {
+                                    console.warn(`Decryption result empty for note ${note.id}. Wrong key?`);
+                                    failCount++;
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Failed to decrypt note:", note.id, e);
+                            failCount++;
+                        }
+                    }
+                }
+
+                if (failCount > 0 && successCount === 0) {
+                    throw new Error("Zero notes decrypted successfully. Key might be wrong.");
+                }
+                console.log(`Decryption Migration: ${successCount} success, ${failCount} failed.`);
+            });
+
+            // Clear key via direct setting update
+            handleUpdateSettings('encryption_key', '');
+
+            setStatusMsg('decryption complete');
+            setTimeout(() => setStatusMsg(''), 2000);
+
+        } catch (e) {
+            console.error("Decryption migration failed:", e);
+            setStatusMsg('decryption failed: check console');
+            setTimeout(() => setStatusMsg(''), 4000);
+        }
+    };
+
+    const handleEncryptAll = async () => {
+        const key = settings.encryption_key;
+        if (!key) {
+            setStatusMsg('Enter a key above first!');
+            setTimeout(() => setStatusMsg(''), 2000);
+            return;
+        }
+
+        setStatusMsg('encrypting all notes...');
+        try {
+            await db.transaction('rw', db.notes, async () => {
+                const allNotes = await db.notes.toArray();
+                let count = 0;
+                for (const note of allNotes) {
+                    if (note.content && !note.content.startsWith('U2F')) {
+                        // Encrypt plaintext note
+                        const encrypted = CryptoJS.AES.encrypt(note.content, key).toString();
+                        await db.notes.update(note.id, {
+                            content: encrypted,
+                            lastModified: new Date().toISOString(),
+                            syncStatus: 'pending'
+                        });
+                        count++;
+                    }
+                }
+                console.log(`Encrypt All: Encrypted ${count} notes.`);
+            });
+
+            // Lock App (Clear Key)
+            handleUpdateSettings('encryption_key', '');
+
+            setStatusMsg('done. app locked.');
+            setTimeout(() => setStatusMsg(''), 2000);
+
+        } catch (e) {
+            console.error("Encryption migration failed:", e);
+            setStatusMsg('encryption failed');
+        }
     };
 
 
@@ -310,8 +452,8 @@ function App() {
 
     const handleRequestMerge = async () => {
         if (!currentUserId) return;
-        // Collect Orphans AND Foreign notes
-        const candidates = await db.notes.filter(n => !n.userId || n.userId !== currentUserId).toArray();
+        // Collect Orphans ONLY
+        const candidates = await db.notes.filter(n => !n.userId && !n.deleted).toArray();
         if (candidates.length > 0) {
             setMergeCandidates(candidates);
             setShowMergeModal(true);
@@ -409,7 +551,7 @@ function App() {
                                         placeholder={settings.placeholder_text}
                                     />
 
-                                    {mode === 'ROOT' && !searchTerm && settings.show_commands_on_homepage !== 'false' && (
+                                    {mode === 'ROOT' && !inputVal && settings.show_commands_on_homepage !== 'false' && (
                                         <>
                                             <div
                                                 className="w-full h-px my-6"

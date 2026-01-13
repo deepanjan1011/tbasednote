@@ -1,16 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { format, isToday, isYesterday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
 
 const NoteList = ({ searchTerm, onSelectNote, settings, limit, currentUserId }) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
+    const containerRef = useRef(null);
 
     const notes = useLiveQuery(
         async () => {
             let collection = db.notes.orderBy('updatedAt').reverse();
             const allRaw = await collection.toArray();
-            const all = allRaw.filter(n => !n.deleted);
+            // Filter: Deleted excluded.
+            // Visibility: Show only notes matching currentUserId OR Orphans (userId is null/undefined)
+            // This hides notes belonging to other logged-out users on the same device.
+            const all = allRaw.filter(n =>
+                !n.deleted &&
+                (!n.userId || (currentUserId && n.userId === currentUserId))
+            );
 
             if (searchTerm) {
                 const lowerTerm = searchTerm.toLowerCase();
@@ -56,11 +63,28 @@ const NoteList = ({ searchTerm, onSelectNote, settings, limit, currentUserId }) 
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [notes, selectedIndex, onSelectNote]);
 
-    // Scroll selected item into view check - rudimentary
+    // Scroll selected item into view safely
     useEffect(() => {
+        if (!containerRef.current) return;
+
+        if (selectedIndex === 0) {
+            containerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+
         const el = document.getElementById(`note-item-${selectedIndex}`);
         if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            const container = containerRef.current;
+            const elTop = el.offsetTop;
+            const elBottom = elTop + el.offsetHeight;
+            const containerTop = container.scrollTop;
+            const containerBottom = containerTop + container.offsetHeight;
+
+            if (elTop < containerTop) {
+                container.scrollTo({ top: elTop, behavior: 'smooth' });
+            } else if (elBottom > containerBottom) {
+                container.scrollTo({ top: elBottom - container.offsetHeight, behavior: 'smooth' });
+            }
         }
     }, [selectedIndex]);
 
@@ -85,9 +109,10 @@ const NoteList = ({ searchTerm, onSelectNote, settings, limit, currentUserId }) 
     return (
         <div className="mt-8 w-full animate-in slide-in-from-top-2">
             <div
-                className="overflow-hidden border rounded-xl"
+                ref={containerRef}
+                className="overflow-hidden border rounded-xl max-h-[60vh] overflow-y-auto"
                 style={{
-                    backgroundColor: 'var(--bg-color)', // Or maybe slightly lighter/surface? Let keep transparent-ish or bg
+                    backgroundColor: 'var(--bg-color)',
                     borderColor: 'var(--border-color)',
                 }}
             >
@@ -122,9 +147,13 @@ const NoteList = ({ searchTerm, onSelectNote, settings, limit, currentUserId }) 
                             >
                                 <span
                                     className="font-mono truncate max-w-[70%] text-sm"
-                                    style={{ color: 'var(--text-color)', opacity: 0.9 }}
+                                    style={{
+                                        color: 'var(--text-color)',
+                                        opacity: 0.9,
+                                        fontFamily: (!settings.encryption_key && note.content?.startsWith('U2F')) ? 'monospace' : 'inherit'
+                                    }}
                                 >
-                                    {note.title || 'Untitled'}
+                                    {(settings.encryption_key || !note.content?.startsWith('U2F')) ? (note.title || 'Untitled') : '••• ENCRYPTED •••'}
                                 </span>
                                 <span
                                     className="text-xs font-mono opacity-40"

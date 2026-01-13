@@ -106,7 +106,7 @@ const SettingsView = ({ settings, onUpdateSettings }) => {
                         if (!prev.has(item.key)) next.add(item.key);
                         return next;
                     });
-                } else if (item.type === 'text' || item.type === 'number') {
+                } else if (item.type === 'text' || item.type === 'number' || item.type === 'password') {
                     setEditingKey(item.key);
                     setEditValue(values[item.key]);
                 } else if (item.type === 'action') {
@@ -157,7 +157,7 @@ const SettingsView = ({ settings, onUpdateSettings }) => {
             return (
                 <input
                     ref={inputRef}
-                    type="text"
+                    type={item.type === 'password' ? 'password' : 'text'}
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
                     onKeyDown={(e) => handleInputKeyDown(e, item.key)}
@@ -180,6 +180,14 @@ const SettingsView = ({ settings, onUpdateSettings }) => {
         const colorClass = isBool
             ? (val === 'false' ? 'text-red-400' : 'text-green-400')
             : 'text-blue-300';
+
+        if (item.type === 'password') {
+            return (
+                <span style={{ color: 'var(--text-color)', opacity: 0.8 }}>
+                    <span className="text-yellow-400">&quot;{val ? '••••••••' : ''}&quot;</span>
+                </span>
+            );
+        }
 
         return (
             <span style={{ color: 'var(--text-color)', opacity: 0.8 }}>

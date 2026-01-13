@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { db } from '../db';
+import { syncNotes } from '../lib/sync';
+import { v4 as uuidv4 } from 'uuid';
 
 const AuthModal = ({ onClose, onRequestMerge }) => {
     // view: 'MENU', 'EMAIL', 'PROFILE'
@@ -67,8 +69,8 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
         const total = allNotes.filter(n => !n.deleted).length;
         const synced = allNotes.filter(n => !n.deleted && n.syncStatus === 'synced' && n.userId === user.id).length;
         const pending = allNotes.filter(n => !n.deleted && n.syncStatus === 'pending' && n.userId === user.id).length;
-        // Local only = Orphaned OR Belonging to another user (potential to merge)
-        const localOnly = allNotes.filter(n => !n.deleted && (!n.userId || n.userId !== user.id)).length;
+        // Local only = Orphans ONLY (Strict) - Hide foreign notes from this count
+        const localOnly = allNotes.filter(n => !n.deleted && !n.userId).length;
         return { total, synced, pending, localOnly };
     }, [user]) || { total: 0, synced: 0, pending: 0, localOnly: 0 };
 
@@ -98,6 +100,50 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
         await supabase.auth.signOut();
         setLoading(false);
         onClose();
+    };
+
+    const handleForceSync = async (e) => {
+        e.stopPropagation();
+        setLoading(true);
+        try {
+            const res = await syncNotes();
+            if (res.error) {
+                if (res.error.includes('row-level security')) {
+                    setError('Fixing ID conflict (RLS)... retrying...');
+                    // Auto-Fix: Regenerate IDs for all pending notes
+                    await db.transaction('rw', db.notes, async () => {
+                        const pending = await db.notes.where('syncStatus').equals('pending').toArray();
+                        let fixedCount = 0;
+                        for (const n of pending) {
+                            if (n.userId === user.id) {
+                                const newId = uuidv4();
+                                await db.notes.add({ ...n, id: newId }); // Clone
+                                await db.notes.delete(n.id); // Delete old
+                                fixedCount++;
+                            }
+                        }
+                        console.log(`RLS Fix: Regenerated ${fixedCount} IDs`);
+                    });
+
+                    // Retry Sync
+                    await handleForceSync(e);
+                    return;
+                }
+                setError(`Sync failed: ${res.error}`);
+            } else {
+                // If we pushed items, it worked
+                if (res.pushed > 0) {
+                    // Success!
+                    setError(''); // Clear error
+                } else if (res.pendingFound > 0 && res.pushed === 0) {
+                    setError(`Sync blocked: found ${res.pendingFound}, pushed 0. User mismatch?`);
+                }
+            }
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Handle Email Login/Signup
@@ -302,7 +348,16 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
                             >
                                 <span className="opacity-50 w-24">synced:</span>
                                 <span className="opacity-80 text-green-400">{stats.synced} notes</span>
-                                {stats.pending > 0 && <span className="text-yellow-400 text-xs">({stats.pending} pending)</span>}
+                                {stats.pending > 0 && (
+                                    <span
+                                        className="text-yellow-400 text-xs flex items-center gap-2 cursor-pointer hover:underline"
+                                        onClick={handleForceSync}
+                                        title="Click to force sync"
+                                    >
+                                        ({stats.pending} pending)
+                                        <span className="opacity-50 hover:opacity-100">↻</span>
+                                    </span>
+                                )}
                             </div>
 
                             {/* Local Orphans (Merge Option) */}

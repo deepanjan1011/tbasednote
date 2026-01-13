@@ -8,11 +8,12 @@ import { supabase } from './supabase';
  * - Strategy: Last Write Wins (based on updatedAt).
  */
 export async function syncNotes() {
-    if (!supabase) return;
+    const result = { pushed: 0, pulled: 0, error: null, pendingFound: 0, userMismatch: 0 };
+    if (!supabase) return result;
 
     // Check auth
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) return result;
 
     try {
         // --- 1. PUSH: Send local changes to Supabase ---
@@ -20,6 +21,17 @@ export async function syncNotes() {
 
         if (pendingNotes.length > 0) {
             console.log(`Syncing ${pendingNotes.length} notes to cloud...`);
+            result.pendingFound = pendingNotes.length;
+
+            // Debug: Check IDs
+            pendingNotes.forEach(n => {
+                if (n.userId !== user.id) {
+                    console.warn(`Mismatch: Note ${n.id} user=${n.userId}, session=${user.id}`);
+                    result.userMismatch++;
+                }
+            });
+
+            // Transform for Supabase (Snake Case)
 
             // Transform for Supabase (Snake Case)
             // CRITICAL: Only sync notes that explicitly belong to this user. 
@@ -46,6 +58,7 @@ export async function syncNotes() {
 
                 if (pushError) {
                     console.error('Push failed:', pushError);
+                    result.error = `Push failed: ${pushError.message}`;
                     // Don't update syncStatus if failed, so we retry next time
                 } else {
                     // On success, mark these IDs as synced locally
@@ -55,16 +68,12 @@ export async function syncNotes() {
                         }
                     });
                     console.log(`Pushed ${upsertData.length} notes.`);
+                    result.pushed = upsertData.length;
                 }
             }
         }
 
         // --- 2. PULL: Fetch remote changes ---
-        // Basic optimization: In a real app, track 'lastSyncedAt' and only fetch newer.
-        // For now, we'll fetch all non-deleted notes to ensure consistency, 
-        // or just fetch everything modified recently. 
-        // Let's implement a 'lastSyncedAt' tracker in localStorage for efficiency.
-
         const lastSyncedAt = localStorage.getItem('vylite_last_synced');
         let query = supabase.from('notes').select('*');
 
@@ -76,7 +85,8 @@ export async function syncNotes() {
 
         if (pullError) {
             console.error('Pull failed:', pullError);
-            return;
+            result.error = `Pull failed: ${pullError.message}`;
+            return result;
         }
 
         if (remoteNotes && remoteNotes.length > 0) {
@@ -112,17 +122,18 @@ export async function syncNotes() {
             });
 
             // Save new high-water mark
-            // We use the current server time ideally, but using the max updated_at from received data is a safe proxy 
-            // provided we handle potential clock skew or just rely on the query we just made.
-            // Safer: just use ISO string of 'now' minus a small buffer, or the latest updated_at seen.
             const latestUpdate = remoteNotes.reduce((max, n) => {
                 return n.updated_at > max ? n.updated_at : max;
             }, lastSyncedAt || '1970-01-01');
 
             localStorage.setItem('vylite_last_synced', latestUpdate);
+            result.pulled = remoteNotes.length;
         }
+
+        return result;
 
     } catch (err) {
         console.error('Sync process error:', err);
+        return { pushed: 0, pulled: 0, error: err.message };
     }
 }

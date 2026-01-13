@@ -3,6 +3,7 @@ import { db } from '../db';
 import { v4 as uuidv4 } from 'uuid';
 import { fetchCompletion, rewriteText } from '../lib/gemini';
 import { getMetaKey } from '../lib/utils';
+import CryptoJS from 'crypto-js';
 
 const NoteEditor = ({ onExit, initialNoteId, settings }) => {
     const [content, setContent] = useState('');
@@ -17,6 +18,8 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
     const [vimMode, setVimMode] = useState('insert'); // 'normal' or 'insert'
     const [yankBuffer, setYankBuffer] = useState('');
     const [pendingKey, setPendingKey] = useState(''); // For multi-key commands like 'gg'
+    const [showRaw, setShowRaw] = useState(false); // New debug mode
+    const [rawContent, setRawContent] = useState(''); // Stored ciphertext
     const textareaRef = useRef(null);
     const metaKey = getMetaKey();
 
@@ -30,15 +33,79 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
         setHistoryIndex(newHistory.length - 1);
     };
 
+    // Encryption Helpers
+    const getEncryptionKey = () => {
+        const key = settings?.encryption_key || '';
+        console.log("Encryption Key:", key ? "****" : "None");
+        return key;
+    };
+
+    const encryptContent = (text) => {
+        const key = getEncryptionKey();
+        if (!key || !text) return text;
+        try {
+            const encrypted = CryptoJS.AES.encrypt(text, key).toString();
+            console.log("Encrypted:", text.substring(0, 10), "->", encrypted.substring(0, 10));
+            return encrypted;
+        } catch (e) {
+            console.error("Encryption failed:", e);
+            return text;
+        }
+    };
+
+    const decryptContent = (text) => {
+        const key = getEncryptionKey();
+
+        // If no key is set, but text looks encrypted, return it RAW (so user sees ciphertext)
+        if (!key) {
+            return text;
+        }
+
+        if (!text) return text;
+
+        try {
+            const bytes = CryptoJS.AES.decrypt(text, key);
+            const originalText = bytes.toString(CryptoJS.enc.Utf8);
+
+            // If empty string returned, it means wrong key for this ciphertext
+            if (!originalText && text.length > 0) {
+                // Return raw ciphertext if decryption fails (Wrong Key)
+                return text;
+            }
+            return originalText;
+        } catch (e) {
+            return text; // Return raw ciphertext on error
+        }
+    };
+
+    // DB Save Helper
+    const saveNote = async (id, data) => {
+        const dataToSave = { ...data };
+        if (dataToSave.content) {
+            // Force encryption check
+            const key = getEncryptionKey();
+            if (key) {
+                const encrypted = encryptContent(dataToSave.content);
+                // Sanity check: did it actually encrypt? (Starts with U2F usually)
+                if (encrypted === dataToSave.content && dataToSave.content.length > 0) {
+                    console.error("Encryption SKIPPED despite key being present!");
+                }
+                dataToSave.content = encrypted;
+            }
+        }
+        return db.notes.update(id, dataToSave);
+    };
+
     useEffect(() => {
         const initNote = async () => {
             if (initialNoteId) {
                 const note = await db.notes.get(initialNoteId);
                 if (note) {
                     setNoteId(note.id);
-                    setContent(note.content);
+                    const decrypted = decryptContent(note.content);
+                    setContent(decrypted);
                     // Init history
-                    setHistory([note.content]);
+                    setHistory([decrypted]);
                     setHistoryIndex(0);
                 } else {
                     // Handle case where note doesn't exist? Fallback to new.
@@ -70,41 +137,27 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
 
         initNote();
         textareaRef.current?.focus();
-    }, [initialNoteId]);
+    }, [initialNoteId, settings.encryption_key]); // React to key changes
+
+    // History debounce logic - moved out of handleChange
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            if (content && history.length > 0 && content !== history[historyIndex]) {
+                saveToHistory(content);
+            } else if (content && history.length === 0) {
+                saveToHistory(content);
+            }
+        }, 1000);
+        return () => clearTimeout(handler);
+    }, [content]);
 
     const handleChange = async (e) => {
         const val = e.target.value;
         setContent(val);
 
-        // Simple debounce for history could go here, but for now we rely on explicit saves or coarse updates
-        // To make undo "feel" native, we usually save on word breaks or pauses. 
-        // For simplicity, we won't save EVERY character to history state to avoid performance issues, 
-        // OR we can save it. Let's try saving every change for now but it might be heavy.
-        // Better: Don't save to history on every keystroke here. 
-        // Rely on a "capture" mechanism or specific check.
-        // Actually, preventing native undo is the main issue. 
-        // Let's rely on saving history ONLY when AI changes things or significant pauses.
-
-        // *Amendment*: Controlled inputs break native undo. We MUST implement a stack or use uncontrolled.
-        // Let's push to history if the length difference is > 5 chars or it's a newline.
-
-
-        // Using a ref to track last saved content to avoid state staleness in debounce
-        const lastSavedContent = useRef(content);
-
-        // Better History Strategy: Save on space/enter or pause
-        useEffect(() => {
-            const handler = setTimeout(() => {
-                if (content !== history[historyIndex]) {
-                    saveToHistory(content);
-                }
-            }, 1000); // Save snapshot 1s after typing stops
-            return () => clearTimeout(handler);
-        }, [content]);
-
         if (noteId) {
             const title = val.split('\n')[0] || 'Untitled';
-            await db.notes.update(noteId, {
+            await saveNote(noteId, {
                 content: val,
                 title: title,
                 updatedAt: new Date(),
@@ -116,6 +169,15 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
 
 
     const handleKeyDown = (e) => {
+        // SECURITY: Block most interactions if locked
+        if (!settings.encryption_key && content.startsWith('U2F')) {
+            // Allow exit keys
+            if (e.key === 'Escape' || e.key === 'Backspace') {
+                onExit();
+            }
+            return;
+        }
+
         const textarea = textareaRef.current;
         if (!textarea) return;
 
@@ -339,7 +401,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
         if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
             e.preventDefault();
             if (noteId) {
-                db.notes.update(noteId, {
+                saveNote(noteId, {
                     deleted: true,
                     syncStatus: 'pending',
                     lastModified: new Date().toISOString()
@@ -373,7 +435,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
                 // Save to DB
                 if (noteId) {
                     const title = newContent.split('\n')[0] || 'Untitled';
-                    await db.notes.update(noteId, {
+                    await saveNote(noteId, {
                         content: newContent,
                         title: title,
                         updatedAt: new Date(),
@@ -412,6 +474,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
     };
 
     const handleRewrite = async () => {
+        if (!settings.encryption_key && content.startsWith('U2F')) return; // Locked security check
         if (!aiInstruction.trim()) return;
 
         // setShowAiInput(false); // Keep it open to show loading state
@@ -432,7 +495,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
             // Save
             if (noteId) {
                 const title = newContent.split('\n')[0] || 'Untitled';
-                await db.notes.update(noteId, {
+                await saveNote(noteId, {
                     content: newContent,
                     title: title,
                     updatedAt: new Date(),
@@ -453,6 +516,20 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
         }
     };
 
+    const toggleRawMode = async () => {
+        if (!showRaw) {
+            // Fetch actual DB content
+            if (noteId) {
+                const note = await db.notes.get(noteId);
+                setRawContent(note?.content || '');
+            }
+            setShowRaw(true);
+        } else {
+            setShowRaw(false);
+            setTimeout(() => textareaRef.current?.focus(), 50);
+        }
+    };
+
     return (
         <div className="fixed inset-0 flex flex-col items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200"
             style={{ backgroundColor: 'var(--bg-color)' }}
@@ -467,15 +544,16 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
             >
                 <textarea
                     ref={textareaRef}
-                    value={content}
-                    onChange={handleChange}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Start typing..."
-                    className="w-full h-full bg-transparent resize-none outline-none"
+                    value={showRaw ? rawContent : content}
+                    onChange={showRaw ? undefined : handleChange}
+                    onKeyDown={showRaw ? undefined : handleKeyDown}
+                    readOnly={showRaw || (!settings.encryption_key && content.startsWith('U2F'))}
+                    placeholder={(!settings.encryption_key && content.startsWith('U2F')) ? "LOCKED (Read-Only)" : "Start typing..."}
+                    className={`w-full h-full bg-transparent resize-none outline-none ${showRaw ? 'font-mono text-xs opacity-70' : ''}`}
                     style={{
-                        fontFamily: settings?.editor_font || 'inherit',
+                        fontFamily: showRaw ? 'monospace' : (settings?.editor_font || 'inherit'),
                         fontSize: settings?.editor_font_size ? `${settings.editor_font_size}px` : 'inherit',
-                        color: 'var(--text-color)'
+                        color: showRaw ? 'var(--muted-color)' : 'var(--text-color)'
                     }}
                     spellCheck="false"
                 />
@@ -556,6 +634,15 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
             {/* Vim Mode Indicator */}
             <div className="absolute bottom-6 left-8 text-xs font-mono font-bold" style={{ color: vimMode === 'normal' ? '#a855f7' : 'var(--muted-color)' }}>
                 -- {vimMode.toUpperCase()} --
+                {settings?.encryption_key &&
+                    <span
+                        className="ml-4 text-xs font-normal opacity-70 cursor-pointer hover:text-white hover:underline transition-all"
+                        onClick={toggleRawMode}
+                        title="Click to view raw encrypted data"
+                    >
+                        {showRaw ? '🔓 View Plaintext' : '🔒 Encrypted (View Raw)'}
+                    </span>
+                }
             </div>
 
             <div className="absolute bottom-6 right-8 text-xs font-mono" style={{ color: 'var(--muted-color)' }}>

@@ -39,6 +39,14 @@ export const SECTIONS = [
         ]
     },
     {
+        title: 'Security',
+        items: [
+            { key: 'encryption_key', value: '', type: 'password', placeholder: 'Enter key to Unlock / Set key' },
+            { key: 'encrypt_all', type: 'action', label: 'Encrypt All & Lock' },
+            { key: 'disable_encryption', type: 'action', label: 'Decrypt All & Turn Off' }
+        ]
+    },
+    {
         title: 'Actions',
         items: [
             { key: 'reset_defaults', type: 'action' }
