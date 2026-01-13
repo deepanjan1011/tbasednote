@@ -50,7 +50,7 @@ const ExportMenu = ({ onClose }) => {
             if (formatOption.id === 'json') {
                 const blob = new Blob([JSON.stringify(activeNotes, null, 2)], { type: 'application/json' });
                 setGeneratedFile(blob);
-                setFileName(`vylite-notes-${timestamp}.json`);
+                setFileName(`0xnote-notes-${timestamp}.json`);
                 setStage('download');
             } else if (formatOption.id === 'markdown') {
                 const zip = new JSZip();
@@ -63,7 +63,7 @@ const ExportMenu = ({ onClose }) => {
 
                 const blob = await zip.generateAsync({ type: 'blob' });
                 setGeneratedFile(blob);
-                setFileName(`vylite-notes-markdown-${timestamp}.zip`);
+                setFileName(`0xnote-notes-markdown-${timestamp}.zip`);
                 setStage('download');
             }
         } catch (error) {

@@ -86,7 +86,7 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
             return;
         }
         setLoading(true);
-        sessionStorage.setItem('vylite_logging_in', 'true'); // Flag for welcome msg
+        sessionStorage.setItem('0xnote_logging_in', 'true'); // Flag for welcome msg
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
         });
@@ -159,7 +159,7 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
 
         setLoading(true);
         setError('');
-        sessionStorage.setItem('vylite_logging_in', 'true'); // Flag for welcome msg
+        sessionStorage.setItem('0xnote_logging_in', 'true'); // Flag for welcome msg
 
         try {
             if (mode === 'SIGN_IN') {
@@ -492,7 +492,7 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
 
                 <div className="mt-8 text-center">
                     <p className="text-[10px] opacity-40 hover:opacity-100 transition-opacity cursor-pointer">
-                        By using Vylite, you agree to the <span className="underline">Terms of Service</span>.
+                        By using 0xNote, you agree to the <span className="underline">Terms of Service</span>.
                     </p>
                 </div>
 

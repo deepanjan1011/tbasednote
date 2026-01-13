@@ -80,12 +80,12 @@ function App() {
                 setMode('ROOT'); // Close auth modal if open
 
                 // Only show welcome message and prompt merge if this is a fresh login action
-                const isFreshLogin = sessionStorage.getItem('vylite_logging_in');
+                const isFreshLogin = sessionStorage.getItem('0xnote_logging_in');
 
                 if (isFreshLogin) {
                     setStatusMsg(`> welcome ${session.user.email?.split('@')[0]}... syncing...`);
                     setTimeout(() => setStatusMsg(''), 1500);
-                    sessionStorage.removeItem('vylite_logging_in');
+                    sessionStorage.removeItem('0xnote_logging_in');
 
                     // Delayed check for fresh logins
                     setTimeout(async () => {
@@ -114,7 +114,7 @@ function App() {
                 setTimeout(() => setStatusMsg(''), 2000);
                 setMode('ROOT');
                 // Optional: Clear local data?
-                // For Vylite "Local First", we might keep them, but it's risky for shared public computers.
+                // For 0xNote "Local First", we might keep them, but it's risky for shared public computers.
                 // Let's keep them for now as per "Speed" requirement, or clear them if strictly "Auth" focused.
                 // Given the instructions, we'll keep the session-based approach simple.
             }

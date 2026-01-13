@@ -1,6 +1,6 @@
-# Vylite Note Clone
+# 0xNote
 
-A minimalist, keyboard-centric note-taking application inspired by the Vylite aesthetic.
+A minimalist, keyboard-centric note-taking application inspired by the Vim aesthetic.
 
 ## Features
 
