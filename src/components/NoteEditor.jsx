@@ -181,6 +181,13 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
                 return;
             }
 
+            // Toggle OUT of Normal Mode (Ctrl+\)
+            if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
+                e.preventDefault();
+                setVimMode('insert');
+                return;
+            }
+
             // Single-key commands
             switch (e.key) {
                 case 'i': // Enter Insert Mode
@@ -288,9 +295,18 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
         }
 
         // ===== INSERT MODE =====
-        // Escape -> Normal Mode
+        // Escape -> Always Exit
         if (e.key === 'Escape') {
-            setVimMode('normal');
+            onExit();
+            return;
+        }
+
+        // Ctrl+\ -> Enter Normal Mode (if enabled)
+        if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
+            if (settings?.enable_vim_mode !== 'false') {
+                e.preventDefault();
+                setVimMode('normal');
+            }
             return;
         }
 
@@ -331,8 +347,8 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
                     .catch(e => console.error("Update failed:", e));
             }
         }
-        // AI Autocomplete (Ctrl+Space)
-        if (e.ctrlKey && e.code === 'Space') {
+        // AI Autocomplete (Ctrl+J)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'j') {
             e.preventDefault();
             if (isGenerating) return;
 
@@ -543,7 +559,12 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
             </div>
 
             <div className="absolute bottom-6 right-8 text-xs font-mono" style={{ color: 'var(--muted-color)' }}>
-                {vimMode === 'normal' ? `i/a ins | hjkl move | w/b 0/$ G/gg nav | x/dd del | yy/p copy | u/${metaKey}+r undo/redo` : `esc normal | ${metaKey}+space AI | ${metaKey}+k edit`}
+                {settings?.enable_vim_mode === 'false'
+                    ? `esc exit | ${metaKey}+j AI | ${metaKey}+k edit`
+                    : vimMode === 'normal'
+                        ? `i/a ins | hjkl move | w/b 0/$ G/gg nav | x/dd del | yy/p copy | u/${metaKey}+r undo/redo`
+                        : `${metaKey.toLowerCase()}+\\ vim | esc exit | ${metaKey}+j AI | ${metaKey}+k edit`
+                }
             </div>
 
         </div>

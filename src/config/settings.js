@@ -21,7 +21,8 @@ export const SECTIONS = [
         title: 'Editor',
         items: [
             { key: 'editor_font', value: 'Inter', type: 'text' },
-            { key: 'editor_font_size', value: '16', unit: 'px', type: 'number' }
+            { key: 'editor_font_size', value: '16', unit: 'px', type: 'number' },
+            { key: 'enable_vim_mode', value: 'true', type: 'boolean' }
         ]
     },
     {
