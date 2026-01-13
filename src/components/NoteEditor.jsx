@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { db } from '../db';
 import { v4 as uuidv4 } from 'uuid';
 import { fetchCompletion, rewriteText } from '../lib/gemini';
+import { getMetaKey } from '../lib/utils';
 
 const NoteEditor = ({ onExit, initialNoteId, settings }) => {
     const [content, setContent] = useState('');
@@ -17,6 +18,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
     const [yankBuffer, setYankBuffer] = useState('');
     const [pendingKey, setPendingKey] = useState(''); // For multi-key commands like 'gg'
     const textareaRef = useRef(null);
+    const metaKey = getMetaKey();
 
     // Save to history helper
     const saveToHistory = (newContent) => {
@@ -169,6 +171,16 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
                 return;
             }
 
+            // Redo (Ctrl+r) - Check BEFORE switch to avoid 'r' case capturing it
+            if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+                e.preventDefault();
+                if (historyIndex < history.length - 1) {
+                    setHistoryIndex(historyIndex + 1);
+                    setContent(history[historyIndex + 1]);
+                }
+                return;
+            }
+
             // Single-key commands
             switch (e.key) {
                 case 'i': // Enter Insert Mode
@@ -266,10 +278,12 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
                         setContent(history[historyIndex - 1]);
                     }
                     return;
-                case 'r': // Redo (Ctrl+r in vim, but we'll use just 'r' for simplicity - might conflict)
-                    // Actually skip 'r' for now since it conflicts with replace char
+                case 'r': // Redo check is handled via Ctrl+r check below/above or we can add it here if unique
+                    // standard vim replace char is 'r' then char. We are skipping advanced replace for now.
                     return;
             }
+
+
             return; // Don't process further in normal mode
         }
 
@@ -529,8 +543,9 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
             </div>
 
             <div className="absolute bottom-6 right-8 text-xs font-mono" style={{ color: 'var(--muted-color)' }}>
-                {vimMode === 'normal' ? 'i insert | hjkl move | dd del | yy/p yank' : 'esc normal | ctrl+space AI | cmd+k edit'}
+                {vimMode === 'normal' ? `i/a ins | hjkl move | w/b 0/$ G/gg nav | x/dd del | yy/p copy | u/${metaKey}+r undo/redo` : `esc normal | ${metaKey}+space AI | ${metaKey}+k edit`}
             </div>
+
         </div>
     );
 };
