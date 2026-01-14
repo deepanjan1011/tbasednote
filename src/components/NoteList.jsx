@@ -3,12 +3,13 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { format, isToday, isYesterday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
 
-const NoteList = ({ searchTerm, onSelectNote, settings, limit, currentUserId }) => {
+const NoteList = ({ searchTerm, onSelectNote, settings, limit, currentUserId, externalNotes }) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const containerRef = useRef(null);
 
-    const notes = useLiveQuery(
+    const liveNotes = useLiveQuery(
         async () => {
+            if (externalNotes) return externalNotes;
             let collection = db.notes.orderBy('updatedAt').reverse();
             const allRaw = await collection.toArray();
             // Filter: Deleted excluded.
@@ -30,10 +31,13 @@ const NoteList = ({ searchTerm, onSelectNote, settings, limit, currentUserId }) 
                 return all.slice(0, limit);
             }
             return all;
+
         },
-        [searchTerm, limit],
+        [searchTerm, limit, externalNotes],
         []
     );
+
+    const notes = externalNotes || liveNotes;
 
     // Reset selection when list changes
     useEffect(() => {

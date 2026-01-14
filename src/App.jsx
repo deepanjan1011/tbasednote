@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase'; // Import supabase here
 import { v4 as uuidv4 } from 'uuid';
 import { fetchJoke } from './lib/joke';
 import { syncNotes } from './lib/sync';
+import { searchNotes } from './lib/search';
 import CommandBar from './components/CommandBar';
 import NoteEditor from './components/NoteEditor';
 import NoteList from './components/NoteList';
@@ -25,6 +26,7 @@ function App() {
     const [activeNoteId, setActiveNoteId] = useState(null);
     const [inputVal, setInputVal] = useState('');
     const [jokeText, setJokeText] = useState('');
+    const [searchResults, setSearchResults] = useState(null);
 
     // Settings State
     // Settings State
@@ -431,11 +433,28 @@ function App() {
                 setSearchTerm('');
                 setInputVal('');
             }
+        } else if (cmd.startsWith('/s ')) {
+            const query = cmd.slice(3).trim();
+            if (query) {
+                setStatusMsg('searching (semantic)...');
+                setMode('LIST');
+                searchNotes(query).then(results => {
+                    setSearchResults(results);
+                    setStatusMsg(`found ${results.length} results`);
+                    setTimeout(() => setStatusMsg(''), 3000);
+                }).catch(err => {
+                    console.error("Search failed:", err);
+                    setStatusMsg('search failed');
+                });
+            }
         }
     };
 
     const handleSearch = (term) => {
         setSearchTerm(term);
+        // Clear semantic results if user types regular search
+        if (searchResults) setSearchResults(null);
+
         // Sync inputVal via onChange
         if (term && mode === 'ROOT') {
             setMode('LIST');
@@ -612,7 +631,13 @@ function App() {
                     )}
 
                     {mode === 'LIST' && (
-                        <NoteList searchTerm={searchTerm} onSelectNote={handleSelectNote} settings={settings} currentUserId={currentUserId} />
+                        <NoteList
+                            searchTerm={searchTerm}
+                            onSelectNote={handleSelectNote}
+                            settings={settings}
+                            currentUserId={currentUserId}
+                            externalNotes={searchResults} // Pass semantic results if any
+                        />
                     )}
 
                     {mode === 'CONF' && (

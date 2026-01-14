@@ -3,7 +3,10 @@ import { db } from '../db';
 import { v4 as uuidv4 } from 'uuid';
 import { fetchCompletion, rewriteText } from '../lib/gemini';
 import { getMetaKey } from '../lib/utils';
+
 import CryptoJS from 'crypto-js';
+import MarkdownView from './MarkdownView';
+import { updateNoteEmbedding } from '../lib/search';
 
 const NoteEditor = ({ onExit, initialNoteId, settings }) => {
     const [content, setContent] = useState('');
@@ -12,6 +15,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
     const [aiStatus, setAiStatus] = useState(''); // 'thinking', 'error', 'success'
     const [showAiInput, setShowAiInput] = useState(false);
     const [aiInstruction, setAiInstruction] = useState('');
+    const [isIndexing, setIsIndexing] = useState(false); // New: indexing status
     const [history, setHistory] = useState([]);
     const [historyIndex, setHistoryIndex] = useState(-1);
     // Vim Mode State
@@ -19,6 +23,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
     const [yankBuffer, setYankBuffer] = useState('');
     const [pendingKey, setPendingKey] = useState(''); // For multi-key commands like 'gg'
     const [showRaw, setShowRaw] = useState(false); // New debug mode
+    const [showPreview, setShowPreview] = useState(false); // Preview mode
     const [rawContent, setRawContent] = useState(''); // Stored ciphertext
     const textareaRef = useRef(null);
     const metaKey = getMetaKey();
@@ -139,6 +144,20 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
         textareaRef.current?.focus();
     }, [initialNoteId, settings.encryption_key]); // React to key changes
 
+    // Global Key Handlers (Cmd+P)
+    useEffect(() => {
+        const handleGlobalKeys = (e) => {
+            // Toggle Preview (Cmd+P)
+            if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+                e.preventDefault();
+                setShowPreview(prev => !prev);
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeys);
+        return () => window.removeEventListener('keydown', handleGlobalKeys);
+    }, []);
+
     // History debounce logic - moved out of handleChange
     useEffect(() => {
         const handler = setTimeout(() => {
@@ -150,6 +169,31 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
         }, 1000);
         return () => clearTimeout(handler);
     }, [content]);
+
+    // Embedding update debounce
+    useEffect(() => {
+        // Skip if encrypted or empty
+        if (!content || !noteId || settings.encryption_key) return;
+
+        const handler = setTimeout(async () => {
+            console.log("Triggering background embedding update...");
+            setIsIndexing(true);
+            try {
+                await updateNoteEmbedding(noteId, content);
+                // Show brief success msg via aiStatus if idle
+                if (!aiStatus) {
+                    setAiStatus('indexed');
+                    setTimeout(() => setAiStatus(''), 2000);
+                }
+            } catch (e) {
+                console.error("Embedding failed:", e);
+            } finally {
+                setIsIndexing(false);
+            }
+        }, 3000); // 3 seconds idle time
+
+        return () => clearTimeout(handler);
+    }, [content, noteId, settings.encryption_key]);
 
     const handleChange = async (e) => {
         const val = e.target.value;
@@ -164,6 +208,72 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
                 syncStatus: 'pending',
                 lastModified: new Date().toISOString()
             });
+        }
+    };
+
+    const handlePaste = async (e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+
+        for (const item of items) {
+            if (item.type.startsWith('image/')) {
+                e.preventDefault();
+                const blob = item.getAsFile();
+                if (blob) {
+                    const imageId = uuidv4();
+                    await db.images.add({
+                        id: imageId,
+                        noteId: noteId,
+                        blob: blob,
+                        createdAt: new Date().toISOString()
+                    });
+
+                    // Insert markdown image link
+                    const cursor = textareaRef.current.selectionStart;
+                    const textToInsert = `![Image](local-image://${imageId})`;
+                    const newContent = content.slice(0, cursor) + textToInsert + content.slice(cursor);
+
+                    saveToHistory(content);
+                    setContent(newContent);
+
+                    // Trigger Save
+                    if (noteId) {
+                        await saveNote(noteId, {
+                            content: newContent,
+                            title: newContent.split('\n')[0] || 'Untitled',
+                            updatedAt: new Date(),
+                            syncStatus: 'pending',
+                            lastModified: new Date().toISOString()
+                        });
+                    }
+
+                    setTimeout(() => {
+                        textareaRef.current.selectionStart = textareaRef.current.selectionEnd = cursor + textToInsert.length;
+                    }, 0);
+                }
+            }
+        }
+
+        // Handle Image URL Paste
+        const pastedText = e.clipboardData?.getData('text');
+        if (pastedText && pastedText.match(/^https?:\/\/.*\.(jpeg|jpg|gif|png|webp)$/i)) {
+            e.preventDefault();
+            const cursor = textareaRef.current.selectionStart;
+            const textToInsert = `![Image](${pastedText})`;
+            const newContent = content.slice(0, cursor) + textToInsert + content.slice(cursor);
+
+            saveToHistory(content);
+            setContent(newContent);
+
+            if (noteId) {
+                await saveNote(noteId, {
+                    content: newContent,
+                    title: newContent.split('\n')[0] || 'Untitled',
+                    updatedAt: new Date(),
+                    syncStatus: 'pending',
+                    lastModified: new Date().toISOString()
+                });
+            }
         }
     };
 
@@ -542,21 +652,28 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
                     borderRadius: '1rem'
                 }}
             >
-                <textarea
-                    ref={textareaRef}
-                    value={showRaw ? rawContent : content}
-                    onChange={showRaw ? undefined : handleChange}
-                    onKeyDown={showRaw ? undefined : handleKeyDown}
-                    readOnly={showRaw || (!settings.encryption_key && content.startsWith('U2F'))}
-                    placeholder={(!settings.encryption_key && content.startsWith('U2F')) ? "LOCKED (Read-Only)" : "Start typing..."}
-                    className={`w-full h-full bg-transparent resize-none outline-none ${showRaw ? 'font-mono text-xs opacity-70' : ''}`}
-                    style={{
-                        fontFamily: showRaw ? 'monospace' : (settings?.editor_font || 'inherit'),
-                        fontSize: settings?.editor_font_size ? `${settings.editor_font_size}px` : 'inherit',
-                        color: showRaw ? 'var(--muted-color)' : 'var(--text-color)'
-                    }}
-                    spellCheck="false"
-                />
+                {showPreview ? (
+                    <div className="w-full h-full overflow-y-auto pr-2 custom-scrollbar">
+                        <MarkdownView content={content} />
+                    </div>
+                ) : (
+                    <textarea
+                        ref={textareaRef}
+                        value={showRaw ? rawContent : content}
+                        onChange={showRaw ? undefined : handleChange}
+                        onKeyDown={showRaw ? undefined : handleKeyDown}
+                        onPaste={handlePaste}
+                        readOnly={showRaw || (!settings.encryption_key && content.startsWith('U2F'))}
+                        placeholder={(!settings.encryption_key && content.startsWith('U2F')) ? "LOCKED (Read-Only)" : "Start typing..."}
+                        className={`w-full h-full bg-transparent resize-none outline-none ${showRaw ? 'font-mono text-xs opacity-70' : ''}`}
+                        style={{
+                            fontFamily: showRaw ? 'monospace' : (settings?.editor_font || 'inherit'),
+                            fontSize: settings?.editor_font_size ? `${settings.editor_font_size}px` : 'inherit',
+                            color: showRaw ? 'var(--muted-color)' : 'var(--text-color)'
+                        }}
+                        spellCheck="false"
+                    />
+                )}
             </div>
 
             {/* AI Action Input */}
@@ -630,6 +747,16 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
                     ✨ done
                 </div>
             )}
+            {aiStatus === 'indexed' && (
+                <div className="absolute top-6 right-8 text-xs font-mono text-blue-400 opacity-70">
+                    indexed
+                </div>
+            )}
+            {isIndexing && !aiStatus && (
+                <div className="absolute top-6 right-8 text-xs font-mono text-purple-400 opacity-50 animate-pulse">
+                    indexing...
+                </div>
+            )}
 
             {/* Vim Mode Indicator */}
             <div className="absolute bottom-6 left-8 text-xs font-mono font-bold" style={{ color: vimMode === 'normal' ? '#a855f7' : 'var(--muted-color)' }}>
@@ -645,7 +772,11 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
                 }
             </div>
 
-            <div className="absolute bottom-6 right-8 text-xs font-mono" style={{ color: 'var(--muted-color)' }}>
+            <div className="absolute bottom-6 right-8 text-xs font-mono flex items-center gap-4" style={{ color: 'var(--muted-color)' }}>
+                <span className={`cursor-pointer hover:text-white transition-colors ${showPreview ? 'text-purple-400 font-bold' : ''}`} onClick={() => setShowPreview(!showPreview)}>
+                    [{showPreview ? 'PREVIEW' : 'EDIT'}] {metaKey}+P
+                </span>
+                <span>|</span>
                 {settings?.enable_vim_mode === 'false'
                     ? `esc exit | ${metaKey}+j AI | ${metaKey}+k edit`
                     : vimMode === 'normal'

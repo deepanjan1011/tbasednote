@@ -62,6 +62,36 @@ export const rewriteText = async (text, instruction) => {
     }
 };
 
+export const getEmbedding = async (text) => {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) return null;
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: "models/text-embedding-004",
+                content: {
+                    parts: [{ text: text }]
+                }
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            console.error("Embedding Error:", data.error);
+            return null;
+        }
+
+        return data.embedding.values;
+    } catch (error) {
+        console.error("Gemini Embedding Error:", error);
+        return null;
+    }
+};
+
 export const askAI = async (notesContext, question) => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) throw new Error('Missing API Key');
