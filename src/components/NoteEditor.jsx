@@ -174,6 +174,16 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
         return () => window.removeEventListener('keydown', handleGlobalKeys);
     }, []);
 
+    // Focus management when switching back from preview
+    useEffect(() => {
+        if (!showPreview) {
+            // Small timeout to ensure DOM is ready if switching logic is heavy
+            setTimeout(() => {
+                textareaRef.current?.focus();
+            }, 0);
+        }
+    }, [showPreview]);
+
     // History debounce logic - moved out of handleChange
     useEffect(() => {
         const handler = setTimeout(() => {
