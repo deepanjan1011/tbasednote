@@ -3,7 +3,8 @@ export const COMMANDS = [
         category: 'CORE',
         items: [
             { cmd: '/c', desc: 'create new note' },
-            { cmd: '/a', desc: 'view all notes' }
+            { cmd: '/a', desc: 'view all notes' },
+            { cmd: '/s', desc: 'semantic search' }
         ]
     },
     {

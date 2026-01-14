@@ -576,7 +576,7 @@ function App() {
                                                 className="w-full h-px my-6"
                                                 style={{ backgroundColor: 'var(--border-color)' }}
                                             />
-                                            <div className="flex gap-4 w-full animate-in fade-in slide-in-from-top-2 flex-shrink-0 flex-wrap">
+                                            <div className="flex gap-2 w-full animate-in fade-in slide-in-from-top-2 flex-shrink-0 flex-nowrap items-center justify-between overflow-x-auto no-scrollbar">
                                                 <div
                                                     className="flex items-center gap-3 px-3 py-2 rounded-lg border text-xs transition-colors hover:bg-white/5 cursor-pointer"
                                                     style={{ borderColor: 'var(--border-color)' }}
@@ -598,6 +598,17 @@ function App() {
                                                         style={{ backgroundColor: 'var(--muted-color)', color: 'var(--text-color)' }}
                                                     >/a</span>
                                                     <span style={{ color: 'var(--muted-color)' }}>view all notes</span>
+                                                </div>
+                                                <div
+                                                    className="flex items-center gap-3 px-3 py-2 rounded-lg border text-xs transition-colors hover:bg-white/5 cursor-pointer"
+                                                    style={{ borderColor: 'var(--border-color)' }}
+                                                    onClick={() => { setInputVal('/s '); document.querySelector('input')?.focus(); }}
+                                                >
+                                                    <span
+                                                        className="px-1.5 py-0.5 rounded font-bold font-mono"
+                                                        style={{ backgroundColor: 'var(--muted-color)', color: 'var(--text-color)' }}
+                                                    >/s</span>
+                                                    <span style={{ color: 'var(--muted-color)' }}>semantic search</span>
                                                 </div>
                                                 <div
                                                     className="flex items-center gap-3 px-3 py-2 rounded-lg border text-xs transition-colors hover:bg-white/5 cursor-pointer"
