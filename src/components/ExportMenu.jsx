@@ -3,6 +3,11 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { db } from '../db';
 
+const FORMAT_OPTIONS = [
+    { id: 'markdown', label: 'export as markdown' },
+    { id: 'json', label: 'export as json' }
+];
+
 const ExportMenu = ({ onClose }) => {
     // Stage: 'selection' (choose format) -> 'download' (download file)
     const [stage, setStage] = useState('selection');
@@ -30,12 +35,6 @@ const ExportMenu = ({ onClose }) => {
         const timer = setTimeout(() => setInteractionReady(true), 200);
         return () => clearTimeout(timer);
     }, []);
-
-    // Options for the first step
-    const FORMAT_OPTIONS = [
-        { id: 'markdown', label: 'export as markdown' },
-        { id: 'json', label: 'export as json' }
-    ];
 
     const handleGenerate = async (formatOption) => {
         setIsGenerating(true);
@@ -74,12 +73,12 @@ const ExportMenu = ({ onClose }) => {
         }
     };
 
-    const handleDownload = () => {
+    const handleDownload = useCallback(() => {
         if (generatedFile) {
             saveAs(generatedFile, fileName);
             onClose(); // Close menu after download
         }
-    };
+    }, [generatedFile, fileName, onClose]);
 
     const handleKeyDown = useCallback((e) => {
         if (!interactionReady) return;
@@ -116,12 +115,11 @@ const ExportMenu = ({ onClose }) => {
             } else if (e.key === 'Enter') {
                 handleGenerate(FORMAT_OPTIONS[selectedIndex]);
             }
-        } else if (stage === 'download') {
             if (e.key === 'Enter') {
                 handleDownload();
             }
         }
-    }, [stage, selectedIndex, generatedFile, fileName, onClose, interactionReady]);
+    }, [stage, selectedIndex, onClose, interactionReady, handleDownload]);
 
     useEffect(() => {
         window.addEventListener('keydown', handleKeyDown);

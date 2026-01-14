@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { db } from '../db';
@@ -11,7 +11,8 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [user, setUser] = useState(null);
-    const [stats, setStats] = useState({ total: 0, synced: 0, pending: 0, localOnly: 0 });
+    // Removed duplicate stats state, using liveStats directly
+
 
     // Menu Navigation State
     const [menuIndex, setMenuIndex] = useState(0); // 0: Google, 1: Email
@@ -72,15 +73,12 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
         // Local only = Orphans ONLY (Strict) - Hide foreign notes from this count
         const localOnly = allNotes.filter(n => !n.deleted && !n.userId).length;
         return { total, synced, pending, localOnly };
-    }, [user]) || { total: 0, synced: 0, pending: 0, localOnly: 0 };
+    }, [user]);
 
-    // Use live stats instead of state
-    useEffect(() => {
-        setStats(liveStats);
-    }, [liveStats]);
+    const stats = liveStats || { total: 0, synced: 0, pending: 0, localOnly: 0 };
 
     // Handle Google Login
-    const handleOAuth = async () => {
+    const handleOAuth = useCallback(async () => {
         if (!isSupabaseConfigured()) {
             setError('Supabase is not configured.');
             return;
@@ -92,17 +90,17 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
         });
         if (error) setError(error.message);
         setLoading(false);
-    };
+    }, []);
 
     // Handle Logout
-    const handleLogout = async () => {
+    const handleLogout = useCallback(async () => {
         setLoading(true);
         await supabase.auth.signOut();
         setLoading(false);
         onClose();
-    };
+    }, [onClose]);
 
-    const handleForceSync = async (e) => {
+    const handleForceSync = useCallback(async (e) => {
         e.stopPropagation();
         setLoading(true);
         try {
@@ -144,10 +142,10 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user]);
 
     // Handle Email Login/Signup
-    const handleEmailAuth = async () => {
+    const handleEmailAuth = useCallback(async () => {
         if (!email || !password) {
             setError('Please enter both email and password.');
             return;
@@ -182,7 +180,13 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [email, password, mode]);
+
+    // Refs for handlers to perform stable calls in keydown listener
+    const handlersRef = useRef({ handleEmailAuth, handleLogout, onClose, onRequestMerge, handleOAuth });
+    useEffect(() => {
+        handlersRef.current = { handleEmailAuth, handleLogout, onClose, onRequestMerge, handleOAuth };
+    }, [handleEmailAuth, handleLogout, onClose, onRequestMerge, handleOAuth]);
 
     // Global Key Listener for Modal
     useEffect(() => {
@@ -213,9 +217,9 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
                 }
                 if (e.key === 'Enter') {
                     if (profileIndex === 3 && stats.localOnly > 0) {
-                        onRequestMerge?.();
+                        handlersRef.current.onRequestMerge?.();
                     } else if (profileIndex === maxIndex) {
-                        handleLogout();
+                        handlersRef.current.handleLogout();
                     }
                 }
             }
@@ -227,7 +231,7 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
                 }
                 if (e.key === 'Enter') {
                     e.preventDefault();
-                    if (menuIndex === 0) handleOAuth();
+                    if (menuIndex === 0) handlersRef.current.handleOAuth();
                     else setView('EMAIL');
                 }
             }
@@ -252,7 +256,7 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
                 if (e.key === 'Enter') {
                     // Allow Enter on buttons to trigger action
                     if (emailStep === 2 || emailStep === 3) {
-                        handleEmailAuth();
+                        handlersRef.current.handleEmailAuth();
                     }
                     // Enter on fields moves to next
                     if (emailStep === 0) {
@@ -269,7 +273,7 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [view, menuIndex, mode, email, password, emailStep, profileIndex]);
+    }, [view, menuIndex, mode, email, password, emailStep, profileIndex, stats.localOnly]); // stats.localOnly needed for index calculation
 
     return (
         <div

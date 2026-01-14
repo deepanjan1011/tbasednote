@@ -7,7 +7,7 @@ export const fetchCompletion = async (context, prompt) => {
     try {
         const fullPrompt = `${context}\n\n[USER REQUEST]: ${prompt || 'Continue the text above creatively and concisely.'}`;
 
-        // Using gemini-2.5-flash as confirmed by user's available model list
+        // Using gemini-2.5-flash as confirmed working
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: {

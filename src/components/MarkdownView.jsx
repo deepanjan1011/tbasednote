@@ -57,7 +57,7 @@ const MarkdownView = ({ content }) => {
                 remarkPlugins={[remarkGfm]}
                 components={{
                     img: ImageRenderer,
-                    code({ node, inline, className, children, ...props }) {
+                    code({ inline, className, children, ...props }) {
                         return !inline ? (
                             <pre className="bg-[var(--bg-color)] p-4 rounded-lg overflow-x-auto border border-[var(--border-color)]">
                                 <code {...props} className={className}>

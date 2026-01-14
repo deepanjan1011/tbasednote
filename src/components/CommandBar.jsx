@@ -1,9 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { cn } from '../lib/utils';
 
 const CommandBar = ({ onCommand, onSearch, value, onChange, placeholder }) => {
-    // eslint-disable-next-line no-unused-vars
-    const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef(null);
 
     useEffect(() => {
@@ -48,8 +46,6 @@ const CommandBar = ({ onCommand, onSearch, value, onChange, placeholder }) => {
                 value={value}
                 onChange={handleChange}
                 onKeyDown={handleKeyDown}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
                 placeholder={placeholder || "Search or command..."}
                 className={cn(
                     "w-full bg-transparent text-lg outline-none py-2 transition-all duration-300 placeholder-[var(--muted-color)]",

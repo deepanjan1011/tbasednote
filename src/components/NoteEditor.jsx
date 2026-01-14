@@ -28,9 +28,26 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
     const textareaRef = useRef(null);
     const metaKey = getMetaKey();
 
+    // Refs for state access in effects/callbacks without deps
+    const historyRef = useRef(history);
+    const historyIndexRef = useRef(historyIndex);
+    const aiStatusRef = useRef(aiStatus);
+
+    useEffect(() => {
+        historyRef.current = history;
+        historyIndexRef.current = historyIndex;
+    }, [history, historyIndex]);
+
+    useEffect(() => {
+        aiStatusRef.current = aiStatus;
+    }, [aiStatus]);
+
+    // Save to history helper
     // Save to history helper
     const saveToHistory = (newContent) => {
-        const newHistory = history.slice(0, historyIndex + 1);
+        const currentHistory = historyRef.current;
+        const currentIndex = historyIndexRef.current;
+        const newHistory = currentHistory.slice(0, currentIndex + 1);
         newHistory.push(newContent);
         // Limit history size
         if (newHistory.length > 50) newHistory.shift();
@@ -39,14 +56,10 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
     };
 
     // Encryption Helpers
-    const getEncryptionKey = () => {
-        const key = settings?.encryption_key || '';
-        console.log("Encryption Key:", key ? "****" : "None");
-        return key;
-    };
+    // Encryption Helpers
 
     const encryptContent = (text) => {
-        const key = getEncryptionKey();
+        const key = settings?.encryption_key || '';
         if (!key || !text) return text;
         try {
             const encrypted = CryptoJS.AES.encrypt(text, key).toString();
@@ -59,7 +72,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
     };
 
     const decryptContent = (text) => {
-        const key = getEncryptionKey();
+        const key = settings?.encryption_key || '';
 
         // If no key is set, but text looks encrypted, return it RAW (so user sees ciphertext)
         if (!key) {
@@ -88,8 +101,9 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
         const dataToSave = { ...data };
         if (dataToSave.content) {
             // Force encryption check
-            const key = getEncryptionKey();
+            const key = settings?.encryption_key || '';
             if (key) {
+                // Direct call to avoid dependency issues or use the helper
                 const encrypted = encryptContent(dataToSave.content);
                 // Sanity check: did it actually encrypt? (Starts with U2F usually)
                 if (encrypted === dataToSave.content && dataToSave.content.length > 0) {
@@ -107,6 +121,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
                 const note = await db.notes.get(initialNoteId);
                 if (note) {
                     setNoteId(note.id);
+                    // Use internal helper or direct logic, here we use the function defined in scope which uses latest settings props
                     const decrypted = decryptContent(note.content);
                     setContent(decrypted);
                     // Init history
@@ -142,7 +157,8 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
 
         initNote();
         textareaRef.current?.focus();
-    }, [initialNoteId, settings.encryption_key]); // React to key changes
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialNoteId, settings.encryption_key]); // Keep specific deps, disable exhaustive check for helper functions that depend on props anyway
 
     // Global Key Handlers (Cmd+P)
     useEffect(() => {
@@ -161,13 +177,23 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
     // History debounce logic - moved out of handleChange
     useEffect(() => {
         const handler = setTimeout(() => {
-            if (content && history.length > 0 && content !== history[historyIndex]) {
+            const currentHistory = historyRef.current;
+            const currentIndex = historyIndexRef.current;
+
+            if (content && currentHistory.length > 0 && content !== currentHistory[currentIndex]) {
                 saveToHistory(content);
-            } else if (content && history.length === 0) {
+            } else if (content && currentHistory.length === 0) {
                 saveToHistory(content);
             }
         }, 1000);
         return () => clearTimeout(handler);
+        // saveToHistory depends on refs so it is stable enough, but strictly speaking it changes if defined inline.
+        // However, we refactored saveToHistory to use refs, so it can be considered stable-ish or we ignore it.
+        // Better: We refactored saveToHistory NOT to use useCallback but just access refs. 
+        // But wait, saveToHistory definition changes on every render!
+        // So we should put saveToHistory dependencies? No, we used refs inside it.
+        // Let's just suppress the warning here because we managed deps manually via refs.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [content]);
 
     // Embedding update debounce
@@ -181,7 +207,9 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
             try {
                 await updateNoteEmbedding(noteId, content);
                 // Show brief success msg via aiStatus if idle
-                if (!aiStatus) {
+                // Check current status via ref to avoid stale closure issues if we were strict,
+                // but here mainly we want to read it.
+                if (!aiStatusRef.current) {
                     setAiStatus('indexed');
                     setTimeout(() => setAiStatus(''), 2000);
                 }
