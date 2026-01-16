@@ -520,6 +520,23 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
             return;
         }
 
+        // Tab Indentation
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+
+            saveToHistory(content);
+            const spaces = '    ';
+            const newContent = content.substring(0, start) + spaces + content.substring(end);
+            setContent(newContent);
+
+            setTimeout(() => {
+                textarea.selectionStart = textarea.selectionEnd = start + spaces.length;
+            }, 0);
+            return;
+        }
+
         // All other Insert Mode handlers (existing code)
         // Ctrl+Z (Undo)
         if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
