@@ -360,6 +360,7 @@ function App() {
                     setSearchTerm('');
                     setInputVal(''); // Clear input on escape
                     setActiveNoteId(null);
+                    setStatusMsg(''); // Clear any lingering status messages instantly
                 }
             }
             if (e.key === 'Backspace' && mode === 'CONF') {
@@ -432,6 +433,8 @@ function App() {
                 setMode('ROOT');
                 setSearchTerm('');
                 setInputVal('');
+                setSearchResults(null);
+                setStatusMsg('');
             }
         } else if (cmd.startsWith('/s ')) {
             const query = cmd.slice(3).trim();
