@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { db } from '../db';
 import { v4 as uuidv4 } from 'uuid';
 import { fetchCompletion, rewriteText } from '../lib/gemini';
-import { getMetaKey } from '../lib/utils';
+import { getMetaKey, isActionKey } from '../lib/utils';
 
 import CryptoJS from 'crypto-js';
 import MarkdownView from './MarkdownView';
@@ -164,7 +164,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
     useEffect(() => {
         const handleGlobalKeys = (e) => {
             // Toggle Preview (Cmd+P)
-            if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+            if (isActionKey(e) && e.key === 'p') {
                 e.preventDefault();
                 setShowPreview(prev => !prev);
             }
@@ -382,7 +382,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
             }
 
             // Redo (Ctrl+r) - Check BEFORE switch to avoid 'r' case capturing it
-            if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+            if (isActionKey(e) && e.key === 'r') {
                 e.preventDefault();
                 if (historyIndex < history.length - 1) {
                     setHistoryIndex(historyIndex + 1);
@@ -392,7 +392,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
             }
 
             // Toggle OUT of Normal Mode (Ctrl+\)
-            if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
+            if (isActionKey(e) && e.key === '\\') {
                 e.preventDefault();
                 setVimMode('insert');
                 return;
@@ -512,7 +512,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
         }
 
         // Ctrl+\ -> Enter Normal Mode (if enabled)
-        if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
+        if (isActionKey(e) && e.key === '\\') {
             if (settings?.enable_vim_mode !== 'false') {
                 e.preventDefault();
                 setVimMode('normal');
@@ -539,7 +539,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
 
         // All other Insert Mode handlers (existing code)
         // Ctrl+Z (Undo)
-        if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        if (isActionKey(e) && e.key === 'z' && !e.shiftKey) {
             e.preventDefault();
             if (historyIndex > 0) {
                 const newIndex = historyIndex - 1;
@@ -551,7 +551,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
         }
 
         // Ctrl+Shift+Z (Redo)
-        if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') {
+        if (isActionKey(e) && e.shiftKey && e.key === 'z') {
             e.preventDefault();
             if (historyIndex < history.length - 1) {
                 const newIndex = historyIndex + 1;
@@ -563,7 +563,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
         }
 
         // Ctrl+D to delete (custom requirement)
-        if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        if (isActionKey(e) && e.key === 'd') {
             e.preventDefault();
             if (noteId) {
                 saveNote(noteId, {
@@ -575,7 +575,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
             }
         }
         // AI Autocomplete (Ctrl+J)
-        if ((e.ctrlKey || e.metaKey) && e.key === 'j') {
+        if (isActionKey(e) && e.key === 'j') {
             e.preventDefault();
             if (isGenerating) return;
 
@@ -618,7 +618,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
             });
         }
         // AI Editor (Cmd+K)
-        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        if (isActionKey(e) && e.key === 'k') {
             e.preventDefault();
 
             if (showAiInput) {
@@ -763,7 +763,7 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
                                         setShowAiInput(false);
                                         textareaRef.current?.focus();
                                     }
-                                    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                                    if (isActionKey(e) && e.key === 'k') {
                                         e.preventDefault();
                                         setShowAiInput(false);
                                         textareaRef.current?.focus();

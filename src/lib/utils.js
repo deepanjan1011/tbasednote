@@ -11,3 +11,10 @@ export function getMetaKey() {
     return isMac ? 'cmd' : 'ctrl';
 }
 
+export function isActionKey(e) {
+    if (typeof navigator === 'undefined') return e.ctrlKey;
+    const isMac = navigator.userAgent.toLowerCase().includes('mac');
+    return isMac ? e.metaKey : e.ctrlKey;
+}
+
+
