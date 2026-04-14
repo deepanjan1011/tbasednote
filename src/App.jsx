@@ -381,6 +381,16 @@ function App() {
         return () => window.removeEventListener('keydown', handleGlobalKeyDown);
     }, [mode]);
 
+    useEffect(() => {
+        if (mode !== 'ROOT') return;
+
+        const timer = setTimeout(() => {
+            document.querySelector('input')?.focus();
+        }, 0);
+
+        return () => clearTimeout(timer);
+    }, [mode]);
+
     const handleCommand = (cmd) => {
         if (cmd === '/c') {
             setStatusMsg('creating note...');

@@ -29,6 +29,7 @@ const CommandBar = ({ onCommand, onSearch, value, onChange, placeholder }) => {
             e.stopPropagation();
             if (value.startsWith('/')) {
                 onCommand?.(value);
+                inputRef.current?.blur();
             } else {
                 onCommand?.(value);
             }
