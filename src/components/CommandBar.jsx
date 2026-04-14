@@ -26,13 +26,17 @@ const CommandBar = ({ onCommand, onSearch, value, onChange, placeholder }) => {
     const handleKeyDown = (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
+            e.stopPropagation();
             if (value.startsWith('/')) {
                 onCommand?.(value);
             } else {
                 onCommand?.(value);
             }
+            return;
         }
         if (e.key === 'Backspace' && value === '') {
+            e.preventDefault();
+            e.stopPropagation();
             onCommand?.('BACKSPACE_EMPTY');
         }
     };

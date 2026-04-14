@@ -43,6 +43,11 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
             isReady.current = true;
         }, 200);
 
+        if (!isSupabaseConfigured()) {
+            setError('Supabase is not configured.');
+            return () => clearTimeout(timer);
+        }
+
         // Check Session and Stats
         supabase.auth.getSession().then(async ({ data: { session } }) => {
             if (session?.user) {
@@ -273,7 +278,7 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [view, menuIndex, mode, email, password, emailStep, profileIndex, stats.localOnly]); // stats.localOnly needed for index calculation
+    }, [view, menuIndex, mode, email, password, emailStep, profileIndex, stats.localOnly, onClose]); // stats.localOnly needed for index calculation
 
     return (
         <div

@@ -8,7 +8,7 @@ import CryptoJS from 'crypto-js';
 import MarkdownView from './MarkdownView';
 import { updateNoteEmbedding } from '../lib/search';
 
-const NoteEditor = ({ onExit, initialNoteId, settings }) => {
+const NoteEditor = ({ onExit, initialNoteId, settings, currentUserId }) => {
     const [content, setContent] = useState('');
     const [noteId, setNoteId] = useState(null);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -147,7 +147,8 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
                     updatedAt: new Date(),
                     syncStatus: 'pending',
                     lastModified: new Date().toISOString(),
-                    deleted: false
+                    deleted: false,
+                    userId: currentUserId || null
                 });
                 setNoteId(id);
             } catch (error) {
@@ -215,11 +216,11 @@ const NoteEditor = ({ onExit, initialNoteId, settings }) => {
             console.log("Triggering background embedding update...");
             setIsIndexing(true);
             try {
-                await updateNoteEmbedding(noteId, content);
+                const indexed = await updateNoteEmbedding(noteId, content);
                 // Show brief success msg via aiStatus if idle
                 // Check current status via ref to avoid stale closure issues if we were strict,
                 // but here mainly we want to read it.
-                if (!aiStatusRef.current) {
+                if (indexed && !aiStatusRef.current) {
                     setAiStatus('indexed');
                     setTimeout(() => setAiStatus(''), 2000);
                 }

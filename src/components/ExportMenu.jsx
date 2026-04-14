@@ -36,7 +36,7 @@ const ExportMenu = ({ onClose }) => {
         return () => clearTimeout(timer);
     }, []);
 
-    const handleGenerate = async (formatOption) => {
+    const handleGenerate = useCallback(async (formatOption) => {
         setIsGenerating(true);
         setSelectedFormatLabel(formatOption.label);
 
@@ -71,7 +71,7 @@ const ExportMenu = ({ onClose }) => {
         } finally {
             setIsGenerating(false);
         }
-    };
+    }, []);
 
     const handleDownload = useCallback(() => {
         if (generatedFile) {
@@ -109,17 +109,23 @@ const ExportMenu = ({ onClose }) => {
 
         if (stage === 'selection') {
             if (e.key === 'ArrowUp') {
+                e.preventDefault();
                 setSelectedIndex(prev => Math.max(0, prev - 1));
             } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
                 setSelectedIndex(prev => Math.min(FORMAT_OPTIONS.length - 1, prev + 1));
             } else if (e.key === 'Enter') {
+                e.preventDefault();
                 handleGenerate(FORMAT_OPTIONS[selectedIndex]);
             }
-            if (e.key === 'Enter') {
-                handleDownload();
-            }
+            return;
         }
-    }, [stage, selectedIndex, onClose, interactionReady, handleDownload]);
+
+        if (stage === 'download' && e.key === 'Enter') {
+            e.preventDefault();
+            handleDownload();
+        }
+    }, [stage, selectedIndex, onClose, interactionReady, handleDownload, handleGenerate]);
 
     useEffect(() => {
         window.addEventListener('keydown', handleKeyDown);

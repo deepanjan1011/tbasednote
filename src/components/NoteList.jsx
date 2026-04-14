@@ -3,6 +3,12 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { format, isToday, isYesterday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
 
+const isEditableTarget = (target) => (
+    target &&
+    typeof target.closest === 'function' &&
+    target.closest('input, textarea, select, [contenteditable]')
+);
+
 const NoteList = ({ searchTerm, onSelectNote, settings, limit, currentUserId, externalNotes }) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const containerRef = useRef(null);
@@ -47,6 +53,7 @@ const NoteList = ({ searchTerm, onSelectNote, settings, limit, currentUserId, ex
     // Keyboard Navigation
     useEffect(() => {
         const handleKeyDown = (e) => {
+            if (e.defaultPrevented || isEditableTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
             if (!notes || notes.length === 0) return;
 
             if (e.key === 'ArrowDown') {

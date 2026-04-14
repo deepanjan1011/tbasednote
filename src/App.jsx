@@ -77,7 +77,7 @@ function App() {
         if (!supabase) return;
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_IN' && session?.user) {
+            if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
                 // User logged in!
                 setMode('ROOT'); // Close auth modal if open
 
@@ -115,6 +115,10 @@ function App() {
                 setStatusMsg('> signing out...');
                 setTimeout(() => setStatusMsg(''), 2000);
                 setMode('ROOT');
+                setCurrentUserEmail('');
+                setCurrentUserId(null);
+                setMergeCandidates([]);
+                setShowMergeModal(false);
                 // Optional: Clear local data?
                 // For 0xNote "Local First", we might keep them, but it's risky for shared public computers.
                 // Let's keep them for now as per "Speed" requirement, or clear them if strictly "Auth" focused.
@@ -384,6 +388,9 @@ function App() {
                 // Create note explicitly here to avoid double-creation in NoteEditor due to React StrictMode
                 try {
                     const newId = uuidv4();
+                    const sessionUserId = currentUserId || (supabase
+                        ? (await supabase.auth.getUser()).data?.user?.id
+                        : null);
                     await db.notes.add({
                         id: newId,
                         title: '',
@@ -392,7 +399,8 @@ function App() {
                         updatedAt: new Date(),
                         syncStatus: 'pending',
                         lastModified: new Date().toISOString(),
-                        deleted: false
+                        deleted: false,
+                        userId: sessionUserId || null
                     });
                     setActiveNoteId(newId);
                     setMode('EDITOR');
@@ -439,15 +447,20 @@ function App() {
         } else if (cmd.startsWith('/s ')) {
             const query = cmd.slice(3).trim();
             if (query) {
-                setStatusMsg('searching (semantic)...');
+                setStatusMsg('searching + indexing...');
                 setMode('LIST');
-                searchNotes(query).then(results => {
+                searchNotes(query, {
+                    currentUserId,
+                    threshold: settings.match_threshold
+                }).then(results => {
                     setSearchResults(results);
                     setStatusMsg(`found ${results.length} results`);
                     setTimeout(() => setStatusMsg(''), 3000);
                 }).catch(err => {
                     console.error("Search failed:", err);
-                    setStatusMsg('search failed');
+                    setSearchResults([]);
+                    setStatusMsg(`search failed: ${err.message}`);
+                    setTimeout(() => setStatusMsg(''), 4000);
                 });
             }
         }
@@ -512,6 +525,7 @@ function App() {
                         syncNotes();
                     }}
                     settings={settings}
+                    currentUserId={currentUserId}
                 />
             ) : (
                 <div

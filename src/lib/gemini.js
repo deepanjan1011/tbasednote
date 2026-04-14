@@ -1,3 +1,13 @@
+const DEFAULT_EMBEDDING_MODEL = 'models/gemini-embedding-001';
+
+export const getEmbeddingModel = () => {
+    const configuredModel = import.meta.env.VITE_GEMINI_EMBEDDING_MODEL?.trim();
+    if (!configuredModel) return DEFAULT_EMBEDDING_MODEL;
+    return configuredModel.startsWith('models/') ? configuredModel : `models/${configuredModel}`;
+};
+
+export const hasGeminiApiKey = () => Boolean(import.meta.env.VITE_GEMINI_API_KEY);
+
 export const fetchCompletion = async (context, prompt) => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
@@ -65,13 +75,14 @@ export const rewriteText = async (text, instruction) => {
 export const getEmbedding = async (text) => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) return null;
+    const model = getEmbeddingModel();
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model}:embedContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model: "models/text-embedding-004",
+                model,
                 content: {
                     parts: [{ text: text }]
                 }
@@ -82,13 +93,18 @@ export const getEmbedding = async (text) => {
 
         if (data.error) {
             console.error("Embedding Error:", data.error);
-            return null;
+            throw new Error(data.error.message || 'Gemini embedding failed.');
+        }
+
+        if (!Array.isArray(data.embedding?.values)) {
+            console.error("Embedding Error: Missing embedding values", data);
+            throw new Error('Gemini embedding response was missing values.');
         }
 
         return data.embedding.values;
     } catch (error) {
         console.error("Gemini Embedding Error:", error);
-        return null;
+        throw error;
     }
 };
 
