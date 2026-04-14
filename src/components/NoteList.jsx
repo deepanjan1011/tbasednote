@@ -11,6 +11,8 @@ const isEditableTarget = (target) => (
 
 const NoteList = ({ searchTerm, onSelectNote, settings, limit, currentUserId, externalNotes }) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
+    const [maxHeight, setMaxHeight] = useState('60vh');
+    const wrapperRef = useRef(null);
     const containerRef = useRef(null);
 
     const liveNotes = useLiveQuery(
@@ -53,8 +55,10 @@ const NoteList = ({ searchTerm, onSelectNote, settings, limit, currentUserId, ex
     // Keyboard Navigation
     useEffect(() => {
         const handleKeyDown = (e) => {
-            if (e.defaultPrevented || isEditableTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+            if (e.metaKey || e.ctrlKey || e.altKey) return;
             if (!notes || notes.length === 0) return;
+
+            const targetIsEditable = isEditableTarget(e.target);
 
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
@@ -63,6 +67,7 @@ const NoteList = ({ searchTerm, onSelectNote, settings, limit, currentUserId, ex
                 e.preventDefault();
                 setSelectedIndex(prev => Math.max(prev - 1, 0));
             } else if (e.key === 'Enter') {
+                if (e.defaultPrevented || targetIsEditable) return;
                 e.preventDefault();
                 if (notes[selectedIndex]) {
                     onSelectNote?.(notes[selectedIndex].id);
@@ -73,6 +78,29 @@ const NoteList = ({ searchTerm, onSelectNote, settings, limit, currentUserId, ex
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [notes, selectedIndex, onSelectNote]);
+
+    useEffect(() => {
+        const updateMaxHeight = () => {
+            if (!wrapperRef.current) return;
+
+            const viewportHeight = window.visualViewport?.height || window.innerHeight;
+            const top = wrapperRef.current.getBoundingClientRect().top;
+            const availableHeight = Math.floor(viewportHeight - top - 24);
+
+            if (availableHeight > 0) {
+                setMaxHeight(`${availableHeight}px`);
+            }
+        };
+
+        updateMaxHeight();
+        window.addEventListener('resize', updateMaxHeight);
+        window.visualViewport?.addEventListener('resize', updateMaxHeight);
+
+        return () => {
+            window.removeEventListener('resize', updateMaxHeight);
+            window.visualViewport?.removeEventListener('resize', updateMaxHeight);
+        };
+    }, [notes?.length, searchTerm, limit, externalNotes]);
 
     // Scroll selected item into view safely
     useEffect(() => {
@@ -118,13 +146,14 @@ const NoteList = ({ searchTerm, onSelectNote, settings, limit, currentUserId, ex
     let lastGroup = null;
 
     return (
-        <div className="mt-8 w-full animate-in slide-in-from-top-2">
+        <div ref={wrapperRef} className="mt-8 w-full animate-in slide-in-from-top-2">
             <div
                 ref={containerRef}
-                className="overflow-hidden border rounded-xl max-h-[60vh] overflow-y-auto"
+                className="overflow-hidden border rounded-xl overflow-y-auto"
                 style={{
                     backgroundColor: 'var(--bg-color)',
                     borderColor: 'var(--border-color)',
+                    maxHeight,
                 }}
             >
                 {notes.map((note, index) => {
