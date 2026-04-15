@@ -712,7 +712,7 @@ function App() {
                     {mode === 'HELP' && <HelpMenu />}
 
                     {mode === 'ROOT' && settings.show_navigation_hints !== 'false' && !inputVal && (
-                        <div className="mt-4 text-xs font-mono opacity-50 text-center" style={{ color: 'var(--muted-color)' }}>
+                        <div className="mt-2 text-xs font-mono opacity-50 text-center" style={{ color: 'var(--muted-color)' }}>
                             type to filter • /f exact • /s smart • /h help
                         </div>
                     )}
