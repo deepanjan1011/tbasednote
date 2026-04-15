@@ -8,6 +8,7 @@ A minimalist, keyboard-centric note-taking application inspired by the Vim aesth
 - **Command Palette**: Access all features via slash commands (`/c`, `/a`, `/conf`).
 - **Void Theme**: Deep dark interface for focused writing.
 - **Local-First**: Fast and private, with notes stored locally.
+- **Optional Cloud Sync**: Supabase-backed auth and sync when configured.
 
 ## Getting Started
 
@@ -28,7 +29,11 @@ A minimalist, keyboard-centric note-taking application inspired by the Vim aesth
 
 - `/c` - Create a new note
 - `/a` - View all notes
+- `/f ...` - Exact search
+- `/s ...` - Smart search
+- `/acc` - Open account details
 - `/conf` - Open configuration settings
+- `/export` - Export notes
 - `/h` - Show help/commands
 - `Esc` - Return to home/root view
 

@@ -1,8 +1,8 @@
 import { db } from '../db';
 import { getEmbedding, getEmbeddingModel, hasGeminiApiKey } from './gemini';
+import { rankLexicalMatches, tokenizeQuery } from './search-utils';
 
 const MIN_INDEXABLE_LENGTH = 1;
-const WORD_PATTERN = /[a-z0-9]+/gi;
 
 const getContentHash = (text = '') => {
     let hash = 5381;
@@ -18,85 +18,30 @@ const getThreshold = (value) => {
     return numeric > 1 ? numeric / 100 : numeric;
 };
 
-const escapeRegExp = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-const tokenizeQuery = (value = '') => value.toLowerCase().match(WORD_PATTERN) || [];
-
-const hasWholeWord = (text, token) => {
-    if (!token) return false;
-    return new RegExp(`\\b${escapeRegExp(token)}\\b`, 'i').test(text);
-};
-
 const isVisibleToUser = (note, currentUserId) => (
     !note.userId || (currentUserId && note.userId === currentUserId)
+);
+
+const isVisibleNote = (note, currentUserId) => (
+    !note.deleted &&
+    isVisibleToUser(note, currentUserId)
 );
 
 const isPlaintextNote = (note) => !note.content?.startsWith('U2F');
 
 const isIndexableNote = (note, currentUserId) => (
-    !note.deleted &&
-    isVisibleToUser(note, currentUserId) &&
+    isVisibleNote(note, currentUserId) &&
     isPlaintextNote(note) &&
     (note.content || '').trim().length >= MIN_INDEXABLE_LENGTH
 );
 
-const rankLexicalMatches = (notes, query) => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const tokens = tokenizeQuery(normalizedQuery);
-    if (!normalizedQuery || tokens.length === 0) return [];
+export const findNotes = async (query, options = {}) => {
+    if (!query) return [];
 
-    return notes
-        .map(note => {
-            const title = (note.title || '').toLowerCase();
-            const content = (note.content || '').toLowerCase();
-            const haystack = `${title}\n${content}`.trim();
-            if (!haystack) return null;
-
-            let score = 0;
-            let matched = false;
-
-            if (title === normalizedQuery) {
-                score += 500;
-                matched = true;
-            }
-
-            if (tokens.length > 1 && title.includes(normalizedQuery)) {
-                score += 260;
-                matched = true;
-            }
-
-            if (tokens.length > 1 && content.includes(normalizedQuery)) {
-                score += 180;
-                matched = true;
-            }
-
-            let matchedTokens = 0;
-            tokens.forEach(token => {
-                const inTitle = hasWholeWord(title, token);
-                const inContent = hasWholeWord(content, token);
-
-                if (inTitle || inContent) {
-                    matchedTokens += 1;
-                    score += inTitle ? 120 : 60;
-                }
-            });
-
-            if (matchedTokens === tokens.length) {
-                score += 140;
-                matched = true;
-            }
-
-            if (!matched) return null;
-
-            return {
-                ...note,
-                searchMode: 'lexical',
-                searchScore: score,
-                updatedAtMs: new Date(note.updatedAt).getTime() || 0
-            };
-        })
-        .filter(Boolean)
-        .sort((a, b) => b.searchScore - a.searchScore || b.updatedAtMs - a.updatedAtMs);
+    const notes = await db.notes.toArray();
+    const currentUserId = options.currentUserId || null;
+    const visibleNotes = notes.filter(note => isVisibleNote(note, currentUserId));
+    return rankLexicalMatches(visibleNotes, query).slice(0, 20);
 };
 
 // Calculate cosine similarity between two vectors

@@ -54,10 +54,6 @@ const AuthModal = ({ onClose, onRequestMerge }) => {
                 setUser(session.user);
                 setView('PROFILE');
                 setProfileIndex(0); // Reset to top
-
-                setUser(session.user);
-                setView('PROFILE');
-                setProfileIndex(0); // Reset to top
             }
         });
 

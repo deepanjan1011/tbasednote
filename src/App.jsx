@@ -4,7 +4,7 @@ import { supabase } from './lib/supabase'; // Import supabase here
 import { v4 as uuidv4 } from 'uuid';
 import { fetchJoke } from './lib/joke';
 import { syncNotes } from './lib/sync';
-import { searchNotes } from './lib/search';
+import { findNotes, searchNotes } from './lib/search';
 import CommandBar from './components/CommandBar';
 import NoteEditor from './components/NoteEditor';
 import NoteList from './components/NoteList';
@@ -473,6 +473,24 @@ function App() {
                     setTimeout(() => setStatusMsg(''), 4000);
                 });
             }
+        } else if (cmd.startsWith('/f ')) {
+            const query = cmd.slice(3).trim();
+            if (query) {
+                setStatusMsg('searching...');
+                setMode('LIST');
+                findNotes(query, {
+                    currentUserId
+                }).then(results => {
+                    setSearchResults(results);
+                    setStatusMsg(`found ${results.length} results`);
+                    setTimeout(() => setStatusMsg(''), 3000);
+                }).catch(err => {
+                    console.error("Exact search failed:", err);
+                    setSearchResults([]);
+                    setStatusMsg(`search failed: ${err.message}`);
+                    setTimeout(() => setStatusMsg(''), 4000);
+                });
+            }
         }
     };
 
@@ -669,13 +687,20 @@ function App() {
                     )}
 
                     {mode === 'LIST' && (
-                        <NoteList
-                            searchTerm={searchTerm}
-                            onSelectNote={handleSelectNote}
-                            settings={settings}
-                            currentUserId={currentUserId}
-                            externalNotes={searchResults} // Pass semantic results if any
-                        />
+                        <>
+                            <NoteList
+                                searchTerm={searchTerm}
+                                onSelectNote={handleSelectNote}
+                                settings={settings}
+                                currentUserId={currentUserId}
+                                externalNotes={searchResults}
+                            />
+                            {settings.show_navigation_hints !== 'false' && (
+                                <div className="mt-3 text-xs font-mono opacity-50 text-center" style={{ color: 'var(--muted-color)' }}>
+                                    ↑↓ move • enter open • esc back
+                                </div>
+                            )}
+                        </>
                     )}
 
                     {mode === 'CONF' && (
@@ -685,6 +710,12 @@ function App() {
 
 
                     {mode === 'HELP' && <HelpMenu />}
+
+                    {mode === 'ROOT' && settings.show_navigation_hints !== 'false' && !inputVal && (
+                        <div className="mt-4 text-xs font-mono opacity-50 text-center" style={{ color: 'var(--muted-color)' }}>
+                            type to filter • /f exact • /s smart • /h help
+                        </div>
+                    )}
 
                     {mode === 'JOKE' && (
                         <div className="mt-20 max-w-md text-center animate-in fade-in zoom-in-95">

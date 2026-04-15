@@ -4,8 +4,7 @@ export const SECTIONS = [
         items: [
             { key: 'theme', value: 'velvet', type: 'select', options: ['light', 'dark', 'velvet'] },
             { key: 'border_radius', value: '0.5', unit: 'rem', type: 'number' },
-            { key: 'border_width', value: '1', unit: 'px', type: 'number' },
-            { key: 'zebra_striping', value: 'false', type: 'boolean' }
+            { key: 'border_width', value: '1', unit: 'px', type: 'number' }
         ]
     },
     {

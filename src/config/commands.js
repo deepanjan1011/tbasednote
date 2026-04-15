@@ -4,7 +4,8 @@ export const COMMANDS = [
         items: [
             { cmd: '/c', desc: 'create new note' },
             { cmd: '/a', desc: 'view all notes' },
-            { cmd: '/s', desc: 'semantic search' }
+            { cmd: '/f', desc: 'exact search' },
+            { cmd: '/s', desc: 'smart search' }
         ]
     },
     {
@@ -23,7 +24,7 @@ export const COMMANDS = [
     {
         category: 'META',
         items: [
-            { cmd: '/h', desc: 'hide commands' }
+            { cmd: '/h', desc: 'toggle help' }
         ]
     },
     {

@@ -107,28 +107,3 @@ export const getEmbedding = async (text) => {
         throw error;
     }
 };
-
-export const askAI = async (notesContext, question) => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) throw new Error('Missing API Key');
-
-    try {
-        const prompt = `Context (User Notes):\n${notesContext}\n\nQuestion: ${question}\n\nAnswer the question based strictly on the context provided. If the answer is not in the notes, say "I couldn't find that in your notes."`;
-
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.5 }
-            })
-        });
-
-        const data = await response.json();
-        if (data.error) throw new Error(data.error.message);
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || "No answer found.";
-    } catch (error) {
-        console.error("Gemini RAG Error:", error);
-        throw error;
-    }
-};
